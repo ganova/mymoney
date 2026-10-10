@@ -1,0 +1,16 @@
+# build
+/bin/
+/mymoney
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# data
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# env
+.env
+.DS_Store
