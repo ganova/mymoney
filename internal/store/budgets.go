@@ -73,14 +73,15 @@ func (s *Store) HasBudget(ctx context.Context, key string) (bool, error) {
 }
 
 // EnsureBudget menyalin budget dari periode terakhir yang punya budget bila
-// periode ini (periode berjalan atau sesudahnya) masih kosong. Dengan begitu
-// rencana bulanan cukup diatur sekali dan otomatis terbawa ke periode berikutnya.
+// periode berjalan masih kosong. Dengan begitu rencana bulanan cukup diatur
+// sekali dan otomatis terbawa ke periode berikutnya. Periode lain (lampau atau
+// yang sekadar diintip ke depan) tidak diisi otomatis; gunakan CopyBudget.
 func (s *Store) EnsureBudget(ctx context.Context, p period.Period) (bool, error) {
 	cur, err := s.CurrentPeriod(ctx)
 	if err != nil {
 		return false, err
 	}
-	if p.Key < cur.Key {
+	if p.Key != cur.Key {
 		return false, nil
 	}
 	has, err := s.HasBudget(ctx, p.Key)

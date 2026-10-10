@@ -7,7 +7,15 @@
   const W = 320;
   const H = 120;
   const PAD_TOP = 14;
-  const max = $derived(Math.max(allowance * 1.15, ...daily.map((d) => d.expense), 1));
+  // Skala tidak ikut lonjakan tagihan besar (mis. cicilan rumah) agar belanja
+  // harian tetap terbaca; batang yang terpotong diberi penanda ▲.
+  const max = $derived.by(() => {
+    const vals = daily.map((d) => d.expense).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!vals.length) return Math.max(allowance * 1.15, 1);
+    const p75 = vals[Math.floor((vals.length - 1) * 0.75)];
+    const cap = Math.max(allowance * 2, p75 * 2.5);
+    return Math.max(Math.min(vals[vals.length - 1], cap), allowance * 1.15, 1);
+  });
   const bw = $derived(W / Math.max(daily.length, 1));
   let sel = $state<number | null>(null);
 
@@ -17,7 +25,7 @@
   function barPath(i: number, v: number): string {
     const x = i * bw + 1;
     const w = Math.max(bw - 2, 1);
-    const top = y(v);
+    const top = y(Math.min(v, max));
     const h = H - top;
     if (h <= 0) return '';
     const r = Math.min(4, w / 2, h);
@@ -42,6 +50,7 @@
     {/if}
     {#each daily as d, i (d.date)}
       <path d={barPath(i, d.expense)} class="bar" class:today={d.date === today} class:future={d.date > today} class:sel={sel === i} />
+      {#if d.expense > max}<text x={i * bw + bw / 2} y={PAD_TOP - 3} text-anchor="middle" class="clip">▲</text>{/if}
       <rect
         x={i * bw}
         y="0"
@@ -70,6 +79,7 @@
   .ref { stroke: var(--muted); stroke-dasharray: 4 3; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .reflabel, .axis { font-size: 9px; fill: var(--muted); }
   .bar { fill: var(--series-1); opacity: 0.55; }
+  .clip { font-size: 8px; fill: var(--series-1); }
   .bar.today, .bar.sel { opacity: 1; }
   .bar.future { opacity: 0.2; }
 </style>

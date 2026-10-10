@@ -33,6 +33,7 @@
     autocomplete="off"
     {placeholder}
     value={thousands(value)}
+    style:width={big ? `${Math.max(1, (thousands(value) || placeholder).length) * 0.62 + 0.4}em` : undefined}
     oninput={onInput}
     aria-label="Nominal"
   />
@@ -45,6 +46,6 @@
   .amount:not(.big) { position: relative; justify-content: flex-start; }
   .amount:not(.big) input { padding-left: 42px; }
   .cur { font-size: 20px; font-weight: 650; color: var(--muted); }
-  .big input { max-width: 85%; }
+  .big input { max-width: 82%; min-width: 1.2em; text-align: left; }
   .highlight { border-radius: 14px; background: var(--warn-soft); }
 </style>

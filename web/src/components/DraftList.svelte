@@ -21,7 +21,8 @@
   let editIndex = $state<number | null>(null);
 
   const count = $derived(selected.filter(Boolean).length);
-  const total = $derived(drafts.reduce((s, d, i) => (selected[i] && d.type === 'expense' ? s + d.amount : s), 0));
+  const allExpense = $derived(drafts.every((d, i) => !selected[i] || d.type === 'expense'));
+  const total = $derived(allExpense ? drafts.reduce((s, d, i) => (selected[i] ? s + d.amount : s), 0) : 0);
 
   let autoTried = false;
   $effect(() => {
@@ -115,11 +116,11 @@
         <div class="grow">
           <div class="ellipsis bold desc">{d.description || 'Tanpa deskripsi'}</div>
           <div class="ellipsis tiny muted">{sub(d)}</div>
-          {#if !saved && (d.amount_estimated || d.duplicate_of || d.duplicate_in_scan || d.confidence < 0.6)}
+          {#if !saved && (d.amount_estimated || d.duplicate_of || d.duplicate_in_scan || (d.confidence < 0.6 && d.type !== 'transfer'))}
             <div class="flags">
               {#if d.amount_estimated}<span class="badge warn">{d.amount ? 'nominal perkiraan' : 'isi nominal'}</span>{/if}
               {#if d.duplicate_of || d.duplicate_in_scan}<span class="badge bad">mungkin sudah tercatat</span>{/if}
-              {#if d.confidence < 0.6 && !d.amount_estimated}<span class="badge">cek kategori</span>{/if}
+              {#if d.confidence < 0.6 && !d.amount_estimated && d.type !== 'transfer'}<span class="badge">cek kategori</span>{/if}
             </div>
           {/if}
         </div>

@@ -3,7 +3,7 @@
   import { app, cat, activeCategories, changed, toast, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { route, go } from '../lib/router.svelte';
-  import { rp, pct } from '../lib/format';
+  import { rp, rpc, pct } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import PeriodNav from '../components/PeriodNav.svelte';
   import Sheet from '../components/Sheet.svelte';
@@ -177,15 +177,15 @@
   {#if d}
     <section class="card summary" class:dim={loading}>
       <div class="grid3">
-        <div><div class="tiny muted">Rencana masuk</div><div class="bold num">{rp(d.plan_income)}</div></div>
-        <div><div class="tiny muted">Rencana keluar</div><div class="bold num">{rp(d.plan_expense)}</div></div>
-        <div><div class="tiny muted">Sisa rencana</div><div class="bold num" class:bad={d.plan_income - d.plan_expense < 0}>{rp(d.plan_income - d.plan_expense)}</div></div>
+        <div><div class="tiny muted">Rencana masuk</div><div class="bold num">{rpc(d.plan_income)}</div></div>
+        <div><div class="tiny muted">Rencana keluar</div><div class="bold num">{rpc(d.plan_expense)}</div></div>
+        <div><div class="tiny muted">Sisa rencana</div><div class="bold num" class:bad={d.plan_income - d.plan_expense < 0}>{rpc(d.plan_income - d.plan_expense)}</div></div>
       </div>
       <hr class="divider" />
       <div class="grid3">
-        <div><div class="tiny muted">Masuk aktual</div><div class="bold num good">{rp(actualIncome)}</div></div>
-        <div><div class="tiny muted">Keluar aktual</div><div class="bold num">{rp(d.expense)}</div></div>
-        <div><div class="tiny muted">Sisa budget</div><div class="bold num" class:bad={sisaBudget < 0}>{rp(sisaBudget)}</div></div>
+        <div><div class="tiny muted">Masuk aktual</div><div class="bold num good">{rpc(actualIncome)}</div></div>
+        <div><div class="tiny muted">Keluar aktual</div><div class="bold num">{rpc(d.expense)}</div></div>
+        <div><div class="tiny muted">Sisa budget</div><div class="bold num" class:bad={sisaBudget < 0}>{rpc(sisaBudget)}</div></div>
       </div>
       {#if d.plan_expense}
         <div class="meter big" class:over={d.budget_spent > d.plan_expense}><i style:width="{Math.min(pct(d.budget_spent, d.plan_expense), 100)}%"></i></div>
@@ -236,17 +236,16 @@
           <button class="list-item" onclick={() => openEdit(b)}>
             <div class="bubble">{c?.icon}</div>
             <div class="grow">
-              <div class="row between">
-                <span class="row ellipsis name">{c?.name}
-                  {#if b.due_day}<span class="badge {paid ? 'good' : ''}">{paid ? '✓ lunas' : `tgl ${b.due_day}`}</span>{/if}
-                </span>
-                <span class="num small nowrap"><strong>{rp(b.actual)}</strong><span class="muted"> / {rp(b.amount)}</span></span>
+              <div class="row name">
+                <span class="ellipsis">{c?.name}</span>
+                {#if b.due_day}<span class="badge {paid ? 'good' : ''}">{paid ? '✓ lunas' : `tgl ${b.due_day}`}</span>{/if}
               </div>
               <div class="meter" class:over class:done={paid} style="margin-top:6px"><i style:width="{Math.min(p, 100)}%"></i></div>
-              <div class="tiny row between" style="margin-top:3px">
-                <span class:bad={over} class:muted={!over}>{over ? `⚠ Lewat ${rp(b.actual - b.amount)}` : `Sisa ${rp(b.amount - b.actual)}`}</span>
-                {#if b.note}<span class="muted ellipsis note">{b.note}</span>{/if}
+              <div class="small row between" style="margin-top:4px">
+                <span class="num"><strong>{rp(b.actual)}</strong><span class="muted"> / {rp(b.amount)}</span></span>
+                <span class="tiny" class:bad={over} class:muted={!over}>{over ? `Lewat ${rp(b.actual - b.amount)}` : `Sisa ${rp(b.amount - b.actual)}`}</span>
               </div>
+              {#if b.note}<div class="tiny muted ellipsis">{b.note}</div>{/if}
             </div>
           </button>
         {/each}
@@ -380,13 +379,11 @@
 <style>
   .summary { display: flex; flex-direction: column; gap: 8px; transition: opacity 0.2s; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .grid3 .bold { font-size: 15px; overflow-wrap: anywhere; }
+  .grid3 .bold { font-size: 15px; white-space: nowrap; letter-spacing: -0.01em; }
   .divider { margin: 4px 0; }
   .meter.big { height: 10px; border-radius: 5px; margin-top: 6px; }
   .dim { opacity: 0.6; }
   .name { gap: 6px; }
-  .nowrap { white-space: nowrap; }
-  .note { max-width: 50%; }
   .actions { margin-top: 8px; }
   .left { text-align: left; }
   .tight { padding: 12px 14px; }

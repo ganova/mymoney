@@ -3,7 +3,7 @@
   import { app, ui, cat, openTx, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { go } from '../lib/router.svelte';
-  import { rp, pct, greeting, shortDate, markdown } from '../lib/format';
+  import { rp, rpc, pct, greeting, shortDate, markdown } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import TxItem from '../components/TxItem.svelte';
   import DailyBars from '../components/DailyBars.svelte';
@@ -157,19 +157,19 @@
     <section class="kpis">
       <div class="card kpi">
         <div class="tiny muted">Pemasukan</div>
-        <div class="v num good">{rp(d.income)}</div>
-        {#if d.plan_income}<div class="tiny muted">dari {rp(d.plan_income)}</div>{/if}
+        <div class="v num good">{rpc(d.income)}</div>
+        {#if d.plan_income}<div class="tiny muted">dari {rpc(d.plan_income)}</div>{/if}
       </div>
       <div class="card kpi">
         <div class="tiny muted">Pengeluaran</div>
-        <div class="v num">{rp(d.expense)}</div>
+        <div class="v num">{rpc(d.expense)}</div>
         {#if expDelta !== null}
           <div class="tiny" class:bad={expDelta > 0} class:good={expDelta <= 0}>{expDelta > 0 ? '▲' : '▼'} {Math.abs(expDelta)}% vs lalu</div>
         {/if}
       </div>
       <div class="card kpi">
         <div class="tiny muted">Selisih</div>
-        <div class="v num" class:bad={d.net < 0}>{rp(d.net)}</div>
+        <div class="v num" class:bad={d.net < 0}>{rpc(d.net)}</div>
         {#if d.plan_expense}<div class="tiny muted">budget {pct(d.budget_spent, d.plan_expense)}%</div>{/if}
       </div>
     </section>
@@ -308,7 +308,7 @@
   .dim { opacity: 0.6; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .kpi { padding: 12px; min-width: 0; }
-  .kpi .v { font-weight: 700; font-size: 15px; margin: 2px 0; overflow-wrap: anywhere; }
+  .kpi .v { font-weight: 700; font-size: 15px; margin: 2px 0; white-space: nowrap; letter-spacing: -0.01em; }
   .alerts { gap: 8px; }
   .alert { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
   .alert.warn { background: var(--warn-soft); }

@@ -49,9 +49,9 @@ type ExtractInput struct {
 	Images    []Image  // screenshot
 	PDFs      [][]byte // e-statement / rekening koran PDF
 	Text      string   // teks mutasi / isi spreadsheet
-	AccountID int64   // 0 = deteksi otomatis
-	Period    string  // periode acuan untuk tanggal berupa angka hari saja
-	Kind      string  // "ai_image" atau "import"
+	AccountID int64    // 0 = deteksi otomatis
+	Period    string   // periode acuan untuk tanggal berupa angka hari saja
+	Kind      string   // "ai_image" atau "import"
 }
 
 // Image adalah gambar yang diunggah.

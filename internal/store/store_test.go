@@ -149,10 +149,12 @@ func TestBudgetCarryOverAndDashboard(t *testing.T) {
 	if d.SpentToday < 100000 || d.Expense != 4738000 {
 		t.Fatalf("today=%d expense=%d", d.SpentToday, d.Expense)
 	}
-	// periode lampau tidak ikut disalin
-	old := prev.Prev()
-	if copied, _ := s.EnsureBudget(ctx, old); copied {
+	// periode lampau dan periode depan tidak diisi otomatis
+	if copied, _ := s.EnsureBudget(ctx, prev.Prev()); copied {
 		t.Fatal("past period should not be auto-filled")
+	}
+	if copied, _ := s.EnsureBudget(ctx, cur.Next()); copied {
+		t.Fatal("future period should not be auto-filled")
 	}
 	r, err := s.Report(ctx, cur, 3)
 	if err != nil || len(r.History) != 3 || r.History[2].Key != cur.Key {

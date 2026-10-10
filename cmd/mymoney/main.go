@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // zona waktu tetap tersedia di image minimal
 
 	"github.com/ganova/mymoney/internal/ai"
 	"github.com/ganova/mymoney/internal/config"

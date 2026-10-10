@@ -6,6 +6,14 @@ export function rp(n: number): string {
   return (n < 0 ? '-Rp' : 'Rp') + s;
 }
 
+/** Rp11,2jt untuk nominal ≥ 10 juta, selain itu lengkap — untuk kartu sempit */
+export function rpc(n: number): string {
+  const a = Math.abs(n);
+  if (a < 10_000_000) return rp(n);
+  const s = (a / 1e6).toFixed(a >= 100_000_000 ? 0 : 1).replace('.', ',').replace(/,0$/, '');
+  return (n < 0 ? '-Rp' : 'Rp') + s + 'jt';
+}
+
 /** 25rb, 1,2jt — untuk label sempit */
 export function rpShort(n: number): string {
   const a = Math.abs(n);

@@ -3,7 +3,7 @@
   import { app, cat, acc, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { back, go, route } from '../lib/router.svelte';
-  import { rp, markdown } from '../lib/format';
+  import { rp, rpc, rpShort, markdown } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import PeriodNav from '../components/PeriodNav.svelte';
   import CategoryBars from '../components/CategoryBars.svelte';
@@ -70,9 +70,9 @@
 
   {#if r}
     <div class="kpis" class:dim={loading}>
-      <div class="card"><div class="tiny muted">Pemasukan</div><div class="bold num good">{rp(r.income)}</div></div>
-      <div class="card"><div class="tiny muted">Pengeluaran</div><div class="bold num">{rp(r.expense)}</div></div>
-      <div class="card"><div class="tiny muted">Selisih</div><div class="bold num" class:bad={r.income - r.expense < 0}>{rp(r.income - r.expense)}</div></div>
+      <div class="card"><div class="tiny muted">Pemasukan</div><div class="bold num good">{rpc(r.income)}</div></div>
+      <div class="card"><div class="tiny muted">Pengeluaran</div><div class="bold num">{rpc(r.expense)}</div></div>
+      <div class="card"><div class="tiny muted">Selisih</div><div class="bold num" class:bad={r.income - r.expense < 0}>{rpc(r.income - r.expense)}</div></div>
     </div>
 
     <section class="card">
@@ -99,7 +99,7 @@
         <thead><tr><th>Periode</th><th>Masuk</th><th>Keluar</th><th>Selisih</th></tr></thead>
         <tbody>
           {#each [...r.history].reverse() as h (h.key)}
-            <tr><td>{h.label}</td><td class="num">{rp(h.income)}</td><td class="num">{rp(h.expense)}</td><td class="num" class:bad={h.income - h.expense < 0}>{rp(h.income - h.expense)}</td></tr>
+            <tr><td>{h.label.slice(0, 3)} {h.label.slice(-2)}</td><td class="num">{rpShort(h.income)}</td><td class="num">{rpShort(h.expense)}</td><td class="num" class:bad={h.income - h.expense < 0}>{rpShort(h.income - h.expense)}</td></tr>
           {/each}
         </tbody>
       </table>
@@ -161,7 +161,7 @@
   .title { font-size: 28px; font-weight: 750; margin-top: -8px; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .kpis .card { padding: 12px; }
-  .kpis .bold { font-size: 14px; overflow-wrap: anywhere; }
+  .kpis .bold { font-size: 14px; white-space: nowrap; letter-spacing: -0.01em; }
   .dim { opacity: 0.6; }
   .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; }
   .tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }

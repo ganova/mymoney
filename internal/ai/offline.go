@@ -166,6 +166,7 @@ func parseSegment(ctx context.Context, st *store.Store, c *Context, seg string) 
 			d.ToAccountID = &cash
 		}
 		d.Description = "Tarik tunai"
+		d.Confidence = 0.8
 	case strings.Contains(lower, "setor tunai"):
 		d.Type = "transfer"
 		d.AccountID = cash
@@ -178,6 +179,7 @@ func parseSegment(ctx context.Context, st *store.Store, c *Context, seg string) 
 		}
 		d.ToAccountID = &to
 		d.Description = "Setor tunai"
+		d.Confidence = 0.8
 	case strings.Contains(lower, "top up") || strings.Contains(lower, "topup") || strings.Contains(lower, "isi saldo") || strings.HasPrefix(lower, "isi "):
 		var target int64
 		for _, m := range mentions {
@@ -197,6 +199,7 @@ func parseSegment(ctx context.Context, st *store.Store, c *Context, seg string) 
 			}
 			d.ToAccountID = &target
 			d.Description = "Top up " + c.accName(target)
+			d.Confidence = 0.8
 		}
 	default:
 		for _, w := range incomeWords {
