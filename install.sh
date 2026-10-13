@@ -13,5 +13,5 @@ docker compose up -d --build
 IP=$( (ipconfig getifaddr en0 || hostname -I | awk '{print $1}') 2>/dev/null )
 echo ""
 echo "✅ MyMoney berjalan!"
-echo "   Komputer : http://localhost:8080"
+echo "   Komputer : http://localhost:7428"
 [ -n "$IP" ] && echo "   iPhone   : http://$IP:8080  (Wi-Fi yang sama, lalu Bagikan → Tambahkan ke Layar Utama)"

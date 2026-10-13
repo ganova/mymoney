@@ -61,7 +61,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Buka **http://localhost:8080** dan masuk dengan `APP_PASSWORD`.
+Buka **http://localhost:7428** dan masuk dengan `APP_PASSWORD`.
 
 Perintah lain:
 ```bash
@@ -85,13 +85,13 @@ Model default `claude-opus-5-5` (paling pintar). Perkiraan biaya pemakaian priba
 
 ### Di jaringan Wi-Fi rumah
 1. Cari IP komputer yang menjalankan Docker (mis. `192.168.1.10`).
-2. Di Safari iPhone buka `http://192.168.1.10:8080`.
+2. Di Safari iPhone buka `http://192.168.1.10:7428`.
 3. Ketuk **Bagikan → Tambahkan ke Layar Utama**. MyMoney kini tampil seperti aplikasi.
 
 ### Dari mana saja (disarankan)
 Pilih salah satu:
 
-- **Tailscale** (gratis, paling mudah & aman): pasang Tailscale di komputer dan iPhone, login dengan akun yang sama, lalu buka `http://nama-komputer:8080`. Untuk HTTPS: `tailscale serve --bg 8080` → buka `https://nama-komputer.tailnet-xxx.ts.net`.
+- **Tailscale** (gratis, paling mudah & aman): pasang Tailscale di komputer dan iPhone, login dengan akun yang sama, lalu buka `http://nama-komputer:7428`. Untuk HTTPS: `tailscale serve --bg 7428` → buka `https://nama-komputer.tailnet-xxx.ts.net`.
 - **Cloudflare Tunnel** (domain sendiri): buat tunnel di dasbor Cloudflare Zero Trust, arahkan hostname ke `http://mymoney:8080`, isi `CLOUDFLARE_TUNNEL_TOKEN` di `.env`, lalu:
   ```bash
   docker compose --profile tunnel up -d
@@ -147,7 +147,7 @@ Mulai periode berikutnya budget otomatis disalin; tinggal mencatat.
 | `AI_VISION_EFFORT` | `medium` | Untuk screenshot, impor, susun budget |
 | `AI_FALLBACKS` | `true` | Server-side fallback bila permintaan ditolak classifier |
 | `TZ` | `Asia/Jakarta` | Zona waktu (menentukan "hari ini" & periode) |
-| `PORT` | `8080` | Port di komputer Anda |
+| `PORT` | `7428` | Port di komputer Anda |
 | `CLOUDFLARE_TUNNEL_TOKEN` | *(kosong)* | Untuk profil `tunnel` |
 
 Tanggal mulai periode, akun default, nama, dan *simpan otomatis* diatur dari halaman **Pengaturan**.

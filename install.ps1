@@ -9,5 +9,5 @@ if (-not (Test-Path .env)) {
 }
 docker compose up -d --build
 $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like '192.168.*' -or $_.IPAddress -like '10.*' } | Select-Object -First 1).IPAddress
-Write-Host "`nMyMoney berjalan!`n  Komputer : http://localhost:8080"
+Write-Host "`nMyMoney berjalan!`n  Komputer : http://localhost:7428"
 if ($ip) { Write-Host "  iPhone   : http://${ip}:8080  (Wi-Fi yang sama)" }

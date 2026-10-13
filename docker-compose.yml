@@ -5,7 +5,7 @@ services:
     container_name: mymoney
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-7428}:8080"
     environment:
       APP_PASSWORD: ${APP_PASSWORD:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
