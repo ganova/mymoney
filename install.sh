@@ -5,9 +5,8 @@ command -v docker >/dev/null || { echo "Docker belum terpasang. Pasang Docker De
 docker info >/dev/null 2>&1 || { echo "Docker belum berjalan. Buka aplikasi Docker Desktop dulu, lalu jalankan ulang skrip ini."; exit 1; }
 if [ ! -f .env ]; then
   cp .env.example .env
-  read -rp "Buat kata sandi login MyMoney: " PW
   read -rp "ANTHROPIC_API_KEY (Enter untuk lewati): " KEY
-  sed -i.bak "s|^APP_PASSWORD=.*|APP_PASSWORD=$PW|; s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$KEY|" .env && rm -f .env.bak
+  sed -i.bak "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$KEY|" .env && rm -f .env.bak
 fi
 docker compose up -d --build
 IP=$( (ipconfig getifaddr en0 || hostname -I | awk '{print $1}') 2>/dev/null )
