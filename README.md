@@ -22,7 +22,12 @@ Dirancang untuk dipakai dari **Safari iPhone** (bisa dipasang di Home Screen sep
 | **Analisis periode** | Ringkasan pola belanja + saran hemat yang konkret |
 | **Belajar dari koreksi** | Setiap kali Anda menyimpan/mengoreksi, AI mengingat pola *deskripsi → kategori & akun* |
 
-Tanpa API key pun aplikasi tetap jalan: input teks memakai **parser offline** (kata kunci, alias akun, dan aturan yang dipelajari).
+### 🆓 Mode gratis (tanpa kredit AI)
+Tanpa API key, aplikasi tetap pintar dan **100% gratis** — semua diproses di komputer Anda:
+- **Catat dari kalimat**: `makan siang 25rb cash`, `tarik tunai 300rb`, `topup gopay 100k`, `kemarin bensin 50rb, parkir 5rb` → kategori, akun, tanggal, dan transfer dikenali dari kata kunci, alias akun, dan kebiasaan Anda. Tanpa nominal (`makan siang`) → nominal ditebak dari transaksi serupa sebelumnya.
+- **Scan screenshot mutasi**: dibaca dengan **OCR Tesseract** (sudah terpasang di image Docker), lalu baris mutasi dikenali (tanggal, nominal, DB/CR, top-up & tarik tunai), dikategorikan, dan dicek duplikatnya.
+- **Tempel teks mutasi** (KlikBCA/myBCA) juga bisa.
+- Belum bisa tanpa AI: tanya-jawab, baca PDF, susun budget otomatis, dan analisis. Hasil OCR sedikit kurang rapi dibanding AI — selalu periksa draf sebelum menyimpan.
 
 ### 📊 Pengelolaan keuangan
 - **Periode keuangan mulai tanggal gajian** (default 28): periode *Oktober* = 28 September – 27 Oktober. Bisa diubah di Pengaturan.

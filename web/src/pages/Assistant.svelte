@@ -126,8 +126,8 @@
     const files = scanFiles;
     scanFiles = null;
     if (!files) return;
-    if (!app.ai.enabled) {
-      messages.push({ id: ++seq, role: 'assistant', text: 'Scan screenshot butuh AI. Isi ANTHROPIC_API_KEY di file .env lalu restart.', error: true });
+    if (!app.ai.enabled && !app.ai.ocr) {
+      messages.push({ id: ++seq, role: 'assistant', text: 'Pembaca screenshot belum tersedia. Jalankan lewat Docker (OCR sudah terpasang) atau isi ANTHROPIC_API_KEY.', error: true });
       return;
     }
     messages.push({ id: ++seq, role: 'user', text: `📷 ${files.length} screenshot mutasi` });
@@ -171,7 +171,7 @@
   <header class="page-head">
     <div>
       <h1>Asisten</h1>
-      <div class="small muted">{app.ai.enabled ? 'Catat atau tanya apa saja' : 'Mode offline — AI belum aktif'}</div>
+      <div class="small muted">{app.ai.enabled ? 'Catat atau tanya apa saja' : 'Mode gratis (tanpa AI) — catat & scan screenshot'}</div>
     </div>
     <div class="row" style="gap:4px">
       {#if messages.length}

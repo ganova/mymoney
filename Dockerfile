@@ -22,18 +22,20 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -X github.com/ganova/mymoney/internal/server.Version=${VERSION}" \
     -o /out/mymoney ./cmd/mymoney
 
-# 3) Image akhir yang kecil (~25 MB). Data zona waktu sudah tertanam di
-#    binary dan sertifikat CA disalin dari builder, jadi tidak perlu apk.
-FROM alpine:3.22
-RUN adduser -D -H -u 10001 app && mkdir -p /data && chown app:app /data
-COPY --from=server /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# 3) Image akhir dengan Tesseract OCR (Indonesia + Inggris) agar screenshot
+#    mutasi bisa dibaca gratis tanpa AI.
+FROM ubuntu:24.04
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tesseract-ocr tesseract-ocr-ind tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -u 10001 -M -s /usr/sbin/nologin app && mkdir -p /data && chown app:app /data
 COPY --from=server /out/mymoney /usr/local/bin/mymoney
 USER app
 ENV DATA_DIR=/data \
     PORT=8080 \
-    TZ=Asia/Jakarta
+    TZ=Asia/Jakarta \
+    OMP_THREAD_LIMIT=1
 VOLUME /data
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["mymoney", "healthcheck"]
 ENTRYPOINT ["mymoney"]

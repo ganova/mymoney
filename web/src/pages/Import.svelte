@@ -65,9 +65,10 @@
   <h1 class="title">Impor Mutasi</h1>
   <p class="small text-2">AI membaca riwayat transaksi, merapikan deskripsi, memilih kategori, mengenali top-up/tarik tunai sebagai transfer, dan menandai yang sudah pernah dicatat.</p>
 
-  {#if !app.ai.enabled}
-    <div class="card empty"><p>Impor butuh AI. Isi <code>ANTHROPIC_API_KEY</code> di file .env lalu restart container.</p></div>
+  {#if !app.ai.enabled && !app.ai.ocr}
+    <div class="card empty"><p>Impor butuh AI atau OCR. Jalankan lewat Docker, atau isi <code>ANTHROPIC_API_KEY</code>.</p></div>
   {:else}
+    {#if !app.ai.enabled}<div class="card small text-2">🆓 Mode gratis: screenshot dibaca dengan OCR di komputer Anda. Hasilnya bisa kurang rapi dibanding AI — periksa sebelum menyimpan. PDF belum didukung tanpa AI.</div>{/if}
     <div class="seg">
       <button class:on={tab === 'image'} onclick={() => (tab = 'image')}>Screenshot</button>
       <button class:on={tab === 'text'} onclick={() => (tab = 'text')}>Tempel teks</button>

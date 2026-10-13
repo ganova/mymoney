@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ganova/mymoney/internal/ocr"
 	"github.com/ganova/mymoney/internal/store"
 )
 
@@ -43,7 +44,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 		"debts":         debts,
 		"period":        cur.Info(),
 		"today":         s.store.Today().Format("2006-01-02"),
-		"ai":            map[string]any{"enabled": s.ai.Enabled(), "model": s.ai.Model()},
+		"ai":            map[string]any{"enabled": s.ai.Enabled(), "model": s.ai.Model(), "ocr": ocr.Available()},
 		"auth_required": s.authRequired(),
 		"version":       Version,
 	})

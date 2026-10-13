@@ -8,7 +8,7 @@ interface Bootstrap {
   debts: Debt[];
   period: PeriodInfo;
   today: string;
-  ai: { enabled: boolean; model: string };
+  ai: { enabled: boolean; model: string; ocr: boolean };
   auth_required: boolean;
   version: string;
 }
@@ -24,7 +24,7 @@ export const app = $state({
   debts: [] as Debt[],
   period: null as PeriodInfo | null,
   today: '',
-  ai: { enabled: false, model: '' },
+  ai: { enabled: false, model: '', ocr: false },
   version: '',
   /** naik setiap kali data berubah, agar halaman memuat ulang */
   dataVersion: 0,

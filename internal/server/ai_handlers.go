@@ -18,6 +18,7 @@ import (
 
 	"github.com/ganova/mymoney/internal/ai"
 	"github.com/ganova/mymoney/internal/money"
+	"github.com/ganova/mymoney/internal/ocr"
 	"github.com/ganova/mymoney/internal/store"
 )
 
@@ -36,7 +37,7 @@ func (s *Server) ask(ctx context.Context, history []ai.HistoryItem, text, source
 		if err != nil {
 			return nil, err
 		}
-		reply := "Mode offline (AI belum aktif): draf dibuat dengan pencocokan kata kunci. Isi ANTHROPIC_API_KEY agar lebih pintar."
+		reply := "Mode gratis (tanpa AI): draf dibuat dari kata kunci & kebiasaanmu. Cek sebelum menyimpan."
 		if len(drafts) == 0 {
 			reply = "Fitur tanya-jawab butuh AI. Isi ANTHROPIC_API_KEY di file .env, atau ketik transaksi seperti \"makan siang 25rb\"."
 		}
@@ -80,6 +81,47 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, res)
+}
+
+// extract membaca transaksi dari screenshot/teks: pakai AI bila aktif,
+// selain itu (atau bila AI gagal) pakai OCR + parser offline yang gratis.
+func (s *Server) extract(ctx context.Context, in ai.ExtractInput) (*ai.ExtractResult, error) {
+	if !s.ai.Enabled() {
+		return s.extractOffline(ctx, in)
+	}
+	res, err := s.ai.Extract(ctx, in)
+	if err == nil {
+		return res, nil
+	}
+	if off, oerr := s.extractOffline(ctx, in); oerr == nil && len(off.Drafts) > 0 {
+		off.Notes = "⚠️ " + err.Error() + ". " + off.Notes
+		return off, nil
+	}
+	return nil, err
+}
+
+func (s *Server) extractOffline(ctx context.Context, in ai.ExtractInput) (*ai.ExtractResult, error) {
+	var b strings.Builder
+	b.WriteString(in.Text)
+	for _, img := range in.Images {
+		text, err := ocr.Read(ctx, img.Data)
+		if err != nil {
+			return nil, &store.ValidationError{Msg: err.Error()}
+		}
+		b.WriteString("\n\n")
+		b.WriteString(text)
+	}
+	if strings.TrimSpace(b.String()) == "" {
+		if len(in.PDFs) > 0 {
+			return nil, &store.ValidationError{Msg: "PDF hanya bisa dibaca dengan AI. Tanpa AI: buka PDF, salin teks mutasinya, lalu tempel di tab Tempel teks"}
+		}
+		return nil, &store.ValidationError{Msg: "tidak ada teks yang bisa dibaca"}
+	}
+	kind := in.Kind
+	if kind == "" {
+		kind = "ai_image"
+	}
+	return ai.ParseStatementOffline(ctx, s.store, b.String(), in.AccountID, in.Period, kind)
 }
 
 var imageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true}
@@ -126,7 +168,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		}
 		in.Images = append(in.Images, img)
 	}
-	res, err := s.ai.Extract(r.Context(), in)
+	res, err := s.extract(r.Context(), in)
 	if err != nil {
 		fail(w, err)
 		return
@@ -224,7 +266,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "tempel teks mutasi atau pilih file dulu")
 		return
 	}
-	res, err := s.ai.Extract(r.Context(), in)
+	res, err := s.extract(r.Context(), in)
 	if err != nil {
 		fail(w, err)
 		return
@@ -415,7 +457,7 @@ func (s *Server) handleShortcutScan(w http.ResponseWriter, r *http.Request) {
 		shortcutReply(w, r, 400, "Tidak ada gambar.", nil)
 		return
 	}
-	res, err := s.ai.Extract(r.Context(), in)
+	res, err := s.extract(r.Context(), in)
 	if err != nil {
 		shortcutReply(w, r, 500, "Gagal membaca screenshot: "+err.Error(), nil)
 		return

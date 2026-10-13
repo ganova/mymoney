@@ -23,6 +23,10 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("mymoney ")
 	cfg := config.Load()
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		healthcheck(cfg)
+		return
+	}
 
 	st, err := store.Open(cfg.DataDir, cfg.Location)
 	if err != nil {
@@ -69,4 +73,13 @@ func main() {
 	defer cancel()
 	httpSrv.Shutdown(ctx)
 	log.Printf("berhenti")
+}
+
+// healthcheck dipakai HEALTHCHECK Docker: keluar 0 bila server menjawab.
+func healthcheck(cfg config.Config) {
+	c := http.Client{Timeout: 3 * time.Second}
+	res, err := c.Get("http://127.0.0.1" + cfg.Addr + "/api/health")
+	if err != nil || res.StatusCode != http.StatusOK {
+		os.Exit(1)
+	}
 }
