@@ -130,14 +130,35 @@
       messages.push({ id: ++seq, role: 'assistant', text: 'Pembaca screenshot belum tersedia. Jalankan lewat Docker (OCR sudah terpasang) atau isi ANTHROPIC_API_KEY.', error: true });
       return;
     }
-    messages.push({ id: ++seq, role: 'user', text: `📷 ${files.length} screenshot mutasi` });
+    const isPdf = files.some((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+    messages.push({ id: ++seq, role: 'user', text: isPdf ? `📄 ${files[0].name}` : `📷 ${files.length} screenshot mutasi` });
     const pendingId = ++seq;
     messages.push({ id: pendingId, role: 'assistant', text: '', pending: true });
     busy = true;
     scrollDown();
     try {
-      const fd = await imagesToForm(files, { account_id: accountId ? String(accountId) : '' });
-      const res = await api.post<ExtractResult>('/ai/scan', fd);
+      let res: ExtractResult;
+      if (isPdf) {
+        const pdf = files.find((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))!;
+        const send = (pw: string) => {
+          const fd = new FormData();
+          fd.append('file', pdf);
+          if (accountId) fd.append('account_id', String(accountId));
+          if (pw) fd.append('pdf_password', pw);
+          return api.post<ExtractResult>('/ai/import', fd);
+        };
+        try {
+          res = await send('');
+        } catch (err) {
+          if (!/terkunci/i.test((err as Error).message)) throw err;
+          const pw = prompt('PDF ini dikunci. Masukkan kata sandi PDF (mis. tanggal lahir DDMMYYYY):') ?? '';
+          if (!pw) throw err;
+          res = await send(pw);
+        }
+      } else {
+        const fd = await imagesToForm(files, { account_id: accountId ? String(accountId) : '' });
+        res = await api.post<ExtractResult>('/ai/scan', fd);
+      }
       const n = res.drafts.length;
       const dup = res.drafts.filter((d) => d.duplicate_of || d.duplicate_in_scan).length;
       let msg = n ? `Ketemu **${n} transaksi**${res.source ? ` dari ${res.source}` : ''}.` : 'Tidak ada transaksi yang terbaca di screenshot ini.';
@@ -190,7 +211,7 @@
         {#each suggestions as s (s)}
           <button class="chip" onclick={() => send(s)}>{s}</button>
         {/each}
-        <button class="chip" onclick={() => fileInput?.click()}>📷 Scan screenshot mutasi</button>
+        <button class="chip" onclick={() => fileInput?.click()}>📷 Scan screenshot / 📄 PDF mutasi</button>
       </div>
     </div>
   {/if}
@@ -237,12 +258,12 @@
   <button type="submit" class="send" disabled={busy || !text.trim()} aria-label="Kirim">
     {#if busy}<span class="spinner"></span>{:else}<Icon name="up" size={20} stroke={2.5} />{/if}
   </button>
-  <input bind:this={fileInput} type="file" accept="image/*" multiple class="hidden" onchange={pickFiles} />
+  <input bind:this={fileInput} type="file" accept="image/*,application/pdf,.pdf" multiple class="hidden" onchange={pickFiles} />
 </form>
 
-<Sheet open={!!scanFiles} onclose={() => (scanFiles = null)} title="Screenshot dari akun mana?">
+<Sheet open={!!scanFiles} onclose={() => (scanFiles = null)} title="Mutasi dari akun mana?">
   <p class="small muted" style="margin-bottom:12px">
-    {scanFiles?.length} gambar dipilih. Pilih akunnya agar transaksi masuk ke rekening yang benar, atau biarkan AI mendeteksi dari tampilan aplikasinya.
+    {scanFiles?.length} file dipilih. Pilih akunnya agar transaksi masuk ke rekening yang benar, atau biarkan AI mendeteksi dari tampilan aplikasinya.
   </p>
   <div class="list">
     <button class="list-item" onclick={() => startScan(0)}>

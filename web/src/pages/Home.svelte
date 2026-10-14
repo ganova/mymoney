@@ -118,7 +118,7 @@
     />
     <button type="button" class="icon-btn" onclick={() => fileInput?.click()} aria-label="Scan screenshot mutasi"><Icon name="camera" /></button>
     <button type="submit" class="send" aria-label="Kirim"><Icon name="up" size={20} stroke={2.5} /></button>
-    <input bind:this={fileInput} type="file" accept="image/*" multiple class="hidden" onchange={pickFiles} />
+    <input bind:this={fileInput} type="file" accept="image/*,application/pdf,.pdf" multiple class="hidden" onchange={pickFiles} />
   </form>
 
   {#if !d && loading}
