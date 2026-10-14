@@ -26,7 +26,7 @@ RUN CGO_ENABLED=0 go build -trimpath \
 #    mutasi bisa dibaca gratis tanpa AI.
 FROM ubuntu:24.04
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates tesseract-ocr tesseract-ocr-ind tesseract-ocr-eng \
+    && apt-get install -y --no-install-recommends ca-certificates tesseract-ocr tesseract-ocr-ind tesseract-ocr-eng poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -u 10001 -M -s /usr/sbin/nologin app && mkdir -p /data && chown app:app /data
 COPY --from=server /out/mymoney /usr/local/bin/mymoney

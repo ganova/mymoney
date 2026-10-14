@@ -111,10 +111,15 @@ func (s *Server) extractOffline(ctx context.Context, in ai.ExtractInput) (*ai.Ex
 		b.WriteString("\n\n")
 		b.WriteString(text)
 	}
-	if strings.TrimSpace(b.String()) == "" {
-		if len(in.PDFs) > 0 {
-			return nil, &store.ValidationError{Msg: "PDF hanya bisa dibaca dengan AI. Tanpa AI: buka PDF, salin teks mutasinya, lalu tempel di tab Tempel teks"}
+	for _, pdf := range in.PDFs {
+		text, err := ocr.ReadPDF(ctx, pdf, in.PDFPassword)
+		if err != nil {
+			return nil, &store.ValidationError{Msg: err.Error()}
 		}
+		b.WriteString("\n\n")
+		b.WriteString(text)
+	}
+	if strings.TrimSpace(b.String()) == "" {
 		return nil, &store.ValidationError{Msg: "tidak ada teks yang bisa dibaca"}
 	}
 	kind := in.Kind
@@ -221,7 +226,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "unggahan terlalu besar atau rusak")
 		return
 	}
-	in := ai.ExtractInput{Kind: "import", Period: r.FormValue("period"), Text: r.FormValue("text")}
+	in := ai.ExtractInput{Kind: "import", Period: r.FormValue("period"), Text: r.FormValue("text"), PDFPassword: r.FormValue("pdf_password")}
 	in.AccountID, _ = strconv.ParseInt(r.FormValue("account_id"), 10, 64)
 	if fhs := r.MultipartForm.File["file"]; len(fhs) > 0 {
 		fh := fhs[0]

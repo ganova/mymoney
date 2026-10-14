@@ -123,3 +123,43 @@ func TestStatementOfflineRealOCR(t *testing.T) {
 	}
 	checkRows(t, res, acc, cat, mybcaWant)
 }
+
+func TestStatementOfflinePDF(t *testing.T) {
+	if !ocr.PDFAvailable() || !ocr.Available() {
+		t.Skip("poppler/tesseract tidak terpasang")
+	}
+	st := testStore(t)
+	acc, cat := names(t, st)
+	ctx := context.Background()
+	klik := []wantRow{
+		{"expense", "", "Hiburan & Rekreasi", "", 43000, "2026-10-05"},
+		{"expense", "Bayar Jahit Nova Kayomi", "Pakaian & Perawatan", "", 80000, "2026-10-05"},
+		{"income", "", "", "", 4499000, "2026-10-06"},
+		{"transfer", "Top up GoPay", "", "GoPay", 21000, "2026-10-07"},
+	}
+	read := func(name, pw string) string {
+		data, err := os.ReadFile("testdata/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text, err := ocr.ReadPDF(ctx, data, pw)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		return text
+	}
+	res, _ := ParseStatementOffline(ctx, st, read("estatement.pdf", ""), 0, "", "import")
+	checkRows(t, res, acc, cat, klik)
+
+	// PDF terkunci: tanpa sandi ditolak dengan pesan jelas, dengan sandi terbaca
+	data, _ := os.ReadFile("testdata/locked.pdf")
+	if _, err := ocr.ReadPDF(ctx, data, ""); err != ocr.ErrPDFPassword {
+		t.Fatalf("expected password error, got %v", err)
+	}
+	res, _ = ParseStatementOffline(ctx, st, read("locked.pdf", "01011990"), 0, "", "import")
+	checkRows(t, res, acc, cat, klik)
+
+	// PDF hasil scan → OCR per halaman
+	res, _ = ParseStatementOffline(ctx, st, read("scan.pdf", ""), 0, "", "import")
+	checkRows(t, res, acc, cat, mybcaWant)
+}

@@ -20,5 +20,5 @@ Aplikasi keuangan pribadi (bahasa Indonesia) untuk satu pengguna, dipakai dari S
 - Budget per (periode, kategori); `due_day > 0` = tagihan. `EnsureBudget` menyalin budget terakhir ke periode berjalan bila kosong.
 - Aturan (`rules`) dipelajari otomatis saat transaksi disimpan/dikoreksi dan dimasukkan ke prompt AI serta parser offline.
 - Draf AI (`ai.Draft`) selalu melewati `Context.Sanitize` agar ID akun/kategori valid; pengguna mengonfirmasi sebelum disimpan (kecuali Shortcut/autosave).
-- Tanpa API key: `ai.ParseOffline` (kalimat) dan `ocr` (Tesseract CLI) + `ai.ParseStatementOffline` (mutasi). `Server.extract` memakai AI bila aktif, offline bila tidak/gagal.
+- Tanpa API key: `ai.ParseOffline` (kalimat) dan `ocr` (Tesseract + poppler untuk PDF) + `ai.ParseStatementOffline` (mutasi). `Server.extract` memakai AI bila aktif, offline bila tidak/gagal.
 - Semua teks UI dan pesan error berbahasa Indonesia.

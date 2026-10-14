@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -109,23 +110,24 @@ func ParseStatementOffline(ctx context.Context, st *store.Store, text string, ac
 				lines = append(lines, l)
 			}
 		}
-		skip := false
+		// buang baris saldo/total/judul, tetapi pertahankan baris lain di blok
+		kept := lines[:0]
 		for _, l := range lines {
 			if stSkipRe.MatchString(l) {
-				skip = true
+				pending = nil
+				continue
 			}
+			kept = append(kept, l)
 		}
-		if skip {
-			pending = nil
-			continue
-		}
+		lines = kept
 		type amt struct {
 			line string
 			loc  []int
+			date string
 		}
 		var amts []amt
 		var texts, afterTexts []string
-		trailingDate := ""
+		trailingDate, lastDate := "", ""
 		for _, l := range lines {
 			if d := findDate(l, c.Today, p); d != "" {
 				// tanggal setelah nominal adalah judul grup berikutnya
@@ -134,12 +136,13 @@ func ParseStatementOffline(ctx context.Context, st *store.Store, text string, ac
 					continue
 				}
 				curDate = d
+				lastDate = d
 				if isDateOnly(l) {
 					continue
 				}
 			}
 			if loc := pickAmount(l); loc != nil {
-				amts = append(amts, amt{l, loc})
+				amts = append(amts, amt{l, loc, curDate})
 			} else if len(stLetterRe.FindAllString(l, -1)) >= 3 {
 				if len(amts) > 0 {
 					afterTexts = append(afterTexts, l)
@@ -155,6 +158,7 @@ func ParseStatementOffline(ctx context.Context, st *store.Store, text string, ac
 				pending = pending[len(pending)-4:]
 			}
 		case len(amts) == 1:
+			curDate = amts[0].date
 			emit(amts[0].line, amts[0].loc, append(pending, texts...), afterTexts)
 			pending = nil
 		default:
@@ -163,12 +167,15 @@ func ParseStatementOffline(ctx context.Context, st *store.Store, text string, ac
 				if len(stLetterRe.FindAllString(cleanDesc(a.line[:a.loc[0]]+a.line[a.loc[1]:]), -1)) >= 3 {
 					ctxLines = nil
 				}
+				curDate = a.date
 				emit(a.line, a.loc, ctxLines, nil)
 				pending = nil
 			}
 		}
 		if trailingDate != "" {
 			curDate = trailingDate
+		} else if lastDate != "" {
+			curDate = lastDate
 		}
 	}
 	res.Notes = "Dibaca tanpa AI (gratis). Periksa nominal, tanggal, dan kategori sebelum menyimpan."
@@ -274,7 +281,18 @@ func titleCase(s string) string {
 // detectAccount menebak akun dari nama aplikasi/bank yang muncul di teks.
 func detectAccount(c *Context, text string) int64 {
 	low := strings.ToLower(text)
-	for _, a := range c.Accounts {
+	// rekening bank diperiksa lebih dulu: mutasi bank sering menyebut nama
+	// e-wallet (mis. "GOPAY TOPUP") yang bukan sumber mutasinya
+	ordered := append([]store.Account{}, c.Accounts...)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Type == "bank" && ordered[j].Type != "bank" })
+	if strings.Contains(low, "e-banking") || strings.Contains(low, "bi-fast") || strings.Contains(low, "tahapan") || strings.Contains(low, "transaksi debit") {
+		for _, a := range ordered {
+			if !a.Archived && a.Type == "bank" {
+				return a.ID
+			}
+		}
+	}
+	for _, a := range ordered {
 		if a.Archived {
 			continue
 		}

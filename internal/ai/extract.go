@@ -46,12 +46,13 @@ func extractSchema() map[string]any {
 
 // ExtractInput adalah sumber data untuk ekstraksi transaksi.
 type ExtractInput struct {
-	Images    []Image  // screenshot
-	PDFs      [][]byte // e-statement / rekening koran PDF
-	Text      string   // teks mutasi / isi spreadsheet
-	AccountID int64    // 0 = deteksi otomatis
-	Period    string   // periode acuan untuk tanggal berupa angka hari saja
-	Kind      string   // "ai_image" atau "import"
+	Images      []Image  // screenshot
+	PDFs        [][]byte // e-statement / rekening koran PDF
+	PDFPassword string   // kata sandi PDF (mode offline)
+	Text        string   // teks mutasi / isi spreadsheet
+	AccountID   int64    // 0 = deteksi otomatis
+	Period      string   // periode acuan untuk tanggal berupa angka hari saja
+	Kind        string   // "ai_image" atau "import"
 }
 
 // Image adalah gambar yang diunggah.

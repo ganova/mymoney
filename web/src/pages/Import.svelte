@@ -13,6 +13,7 @@
   let text = $state('');
   let images = $state<File[]>([]);
   let file = $state<File | null>(null);
+  let pdfPassword = $state('');
   let busy = $state(false);
   let result = $state<ExtractResult | null>(null);
 
@@ -47,6 +48,7 @@
         } else {
           if (!file) throw new Error('Pilih file dulu');
           fd.append('file', file);
+          if (pdfPassword) fd.append('pdf_password', pdfPassword);
         }
         result = await api.post<ExtractResult>('/ai/import', fd);
       }
@@ -68,7 +70,7 @@
   {#if !app.ai.enabled && !app.ai.ocr}
     <div class="card empty"><p>Impor butuh AI atau OCR. Jalankan lewat Docker, atau isi <code>ANTHROPIC_API_KEY</code>.</p></div>
   {:else}
-    {#if !app.ai.enabled}<div class="card small text-2">🆓 Mode gratis: screenshot dibaca dengan OCR di komputer Anda. Hasilnya bisa kurang rapi dibanding AI — periksa sebelum menyimpan. PDF belum didukung tanpa AI.</div>{/if}
+    {#if !app.ai.enabled}<div class="card small text-2">🆓 Mode gratis: screenshot dibaca dengan OCR di komputer Anda. Hasilnya bisa kurang rapi dibanding AI — periksa sebelum menyimpan.</div>{/if}
     <div class="seg">
       <button class:on={tab === 'image'} onclick={() => (tab = 'image')}>Screenshot</button>
       <button class:on={tab === 'text'} onclick={() => (tab = 'text')}>Tempel teks</button>
@@ -90,6 +92,12 @@
           <span>{file ? file.name : 'Excel (.xlsx), CSV, atau PDF e-statement'}</span>
           <input type="file" accept=".xlsx,.xlsm,.csv,.txt,.pdf,image/*" class="hidden" onchange={(e) => (file = (e.currentTarget as HTMLInputElement).files?.[0] ?? null)} />
         </label>
+        {#if file?.name.toLowerCase().endsWith('.pdf')}
+          <label class="field">
+            <span>Kata sandi PDF (bila dikunci)</span>
+            <input class="input" type="password" bind:value={pdfPassword} placeholder="mis. tanggal lahir DDMMYYYY" autocomplete="off" />
+          </label>
+        {/if}
         <p class="tiny muted">Bisa juga file Google Sheet lama (File → Download → .xlsx). Untuk tanggal yang hanya berupa angka hari, AI memakai periode di bawah.</p>
       {/if}
 
