@@ -76,34 +76,6 @@ func (c *client) json(method, path string, body any, v any) int {
 	return code
 }
 
-func TestAuthFlow(t *testing.T) {
-	c, _ := newTestServer(t, "rahasia")
-	if code, _ := c.do("GET", "/api/bootstrap", nil); code != 401 {
-		t.Fatalf("expected 401, got %d", code)
-	}
-	if code, _ := c.do("POST", "/api/auth/login", map[string]string{"password": "salah"}); code != 401 {
-		t.Fatalf("wrong password: %d", code)
-	}
-	if code, _ := c.do("POST", "/api/auth/login", map[string]string{"password": "rahasia"}); code != 200 {
-		t.Fatalf("login: %d", code)
-	}
-	var b struct {
-		Period struct{ Key string } `json:"period"`
-		AI     struct{ Enabled bool }
-	}
-	if code := c.json("GET", "/api/bootstrap", nil, &b); code != 200 || b.Period.Key == "" || b.AI.Enabled {
-		t.Fatalf("bootstrap %d %+v", code, b)
-	}
-	// pembatas login: 5 kegagalan per menit
-	c.do("POST", "/api/auth/logout", nil)
-	for i := 0; i < 5; i++ {
-		c.do("POST", "/api/auth/login", map[string]string{"password": "x"})
-	}
-	if code, _ := c.do("POST", "/api/auth/login", map[string]string{"password": "rahasia"}); code != 429 {
-		t.Fatalf("expected rate limit, got %d", code)
-	}
-}
-
 func TestTransactionsAndDashboard(t *testing.T) {
 	c, st := newTestServer(t, "")
 	var boot struct {
@@ -177,9 +149,6 @@ func TestAskOfflineAndShortcut(t *testing.T) {
 		t.Fatal(err)
 	}
 	anon := &client{t: t, base: c.base, http: &http.Client{}}
-	if code, _ := anon.do("POST", "/api/shortcut/ask", "makan siang 25rb"); code != 401 {
-		t.Fatalf("shortcut without token: %d", code)
-	}
 	code, out := anon.do("POST", "/api/shortcut/ask", "makan siang 25rb", "Authorization", "Bearer "+raw)
 	if code != 200 || !strings.Contains(string(out), "Makan siang") || !strings.Contains(string(out), "Rp25.000") {
 		t.Fatalf("shortcut %d %s", code, out)

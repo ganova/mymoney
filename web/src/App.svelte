@@ -5,7 +5,6 @@
   import TabBar from './components/TabBar.svelte';
   import Toast from './components/Toast.svelte';
   import TxEditor from './components/TxEditor.svelte';
-  import Login from './pages/Login.svelte';
   import Home from './pages/Home.svelte';
   import Assistant from './pages/Assistant.svelte';
   import Transactions from './pages/Transactions.svelte';
@@ -46,8 +45,6 @@
       <button class="btn primary" style="margin-top:16px" onclick={() => location.reload()}>Coba lagi</button>
     </div>
   </div>
-{:else if !app.authenticated}
-  <Login />
 {:else}
   {#key route.path}
     <Page />

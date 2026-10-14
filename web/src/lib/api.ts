@@ -1,4 +1,3 @@
-import { app } from './state.svelte';
 
 export class ApiError extends Error {
   status: number;
@@ -22,9 +21,6 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     throw new ApiError('Tidak bisa terhubung ke server. Cek koneksi.', 0);
-  }
-  if (res.status === 401) {
-    app.authenticated = false;
   }
   const text = await res.text();
   let data: any = null;

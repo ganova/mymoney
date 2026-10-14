@@ -41,7 +41,9 @@ func sessionSecret(cfg config.Config, st *store.Store) ([]byte, error) {
 	return b, nil
 }
 
-func (s *Server) authRequired() bool { return s.cfg.Password != "" }
+// authRequired: aplikasi sengaja tanpa halaman login (dipakai pribadi di
+// jaringan rumah). Token Shortcut tetap diterima bila dikirim.
+func (s *Server) authRequired() bool { return false }
 
 // sign menghasilkan token sesi "expiry.signature". Kata sandi ikut ditandatangani
 // sehingga mengganti APP_PASSWORD otomatis mengeluarkan semua sesi lama.

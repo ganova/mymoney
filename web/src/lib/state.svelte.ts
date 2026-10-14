@@ -49,8 +49,8 @@ export async function bootstrap(): Promise<void> {
   try {
     const st = await api.get<{ auth_required: boolean; authenticated: boolean }>('/auth/status');
     app.authRequired = st.auth_required;
-    app.authenticated = st.authenticated;
-    if (st.authenticated) await loadBootstrap();
+    app.authenticated = true;
+    await loadBootstrap();
     app.error = '';
   } catch (e) {
     app.error = (e as Error).message;
