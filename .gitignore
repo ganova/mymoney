@@ -14,3 +14,4 @@ web/dist/*
 # env
 .env
 .DS_Store
+/mymoney.exe

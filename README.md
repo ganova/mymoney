@@ -191,3 +191,9 @@ Pasang Codex CLI di PC (`npm i -g @openai/codex`, lalu `codex login`). Bila `ANT
 - Tombol **Pribadi | Work** di atas aplikasi memilih buku keuangan. Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri; data lama otomatis masuk ke Pribadi. Transfer antar buku (mis. Work → Pribadi) dicatat lewat jenis *Transfer*.
 - Pemasukan bisa diberi **sumber** (bawaan: CMW dan Freelance; kelola di Lainnya → Sumber Pemasukan & Buku). AI, parser offline, dan Codex mengisinya dari kata kunci; Beranda dan Laporan menampilkan total per sumber.
 - iPhone Shortcut: tambahkan `?ledger=2` pada URL (atau header `X-Ledger: 2`) untuk mencatat ke buku Work; tanpa itu masuk ke Pribadi.
+
+## Build & update di Windows (tanpa unduh exe)
+Sekali: `winget install Git.Git GoLang.Go OpenJS.NodeJS.LTS`, buka PowerShell baru, lalu
+`git clone -b claude/bold-turing-wo2evh https://github.com/ganova/mymoney.git` dan `cd mymoney`.
+Setiap kali ingin memasang/memperbarui: `powershell -ExecutionPolicy Bypass -File update-windows.ps1`
+(menarik kode terbaru, membangun exe di PC sendiri, menghentikan versi lama, memasang, dan menjalankan). Data di `%LOCALAPPDATA%\MyMoney\data` tidak disentuh.
