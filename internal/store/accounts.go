@@ -16,6 +16,7 @@ type Account struct {
 	Color          string `json:"color"`
 	OpeningBalance int64  `json:"opening_balance"`
 	Aliases        string `json:"aliases"`
+	LedgerID       int64  `json:"ledger_id"`
 	Archived       bool   `json:"archived"`
 	Sort           int    `json:"sort"`
 	Balance        int64  `json:"balance"`
@@ -26,7 +27,7 @@ var accountTypes = map[string]bool{"bank": true, "cash": true, "ewallet": true, 
 
 // balanceSQL menghitung saldo setiap akun dari seluruh transaksi.
 const balanceSQL = `
-SELECT a.id, a.name, a.type, a.icon, a.color, a.opening_balance, a.aliases, a.archived, a.sort,
+SELECT a.id, a.name, a.type, a.icon, a.color, a.opening_balance, a.aliases, a.archived, a.sort, a.ledger_id,
   a.opening_balance
   + COALESCE((SELECT SUM(CASE t.type WHEN 'income' THEN t.amount WHEN 'adjust' THEN t.amount ELSE -t.amount END)
               FROM transactions t WHERE t.account_id = a.id), 0)
@@ -36,13 +37,13 @@ FROM accounts a`
 
 func scanAccount(sc interface{ Scan(...any) error }) (Account, error) {
 	var a Account
-	err := sc.Scan(&a.ID, &a.Name, &a.Type, &a.Icon, &a.Color, &a.OpeningBalance, &a.Aliases, &a.Archived, &a.Sort, &a.Balance, &a.TxCount)
+	err := sc.Scan(&a.ID, &a.Name, &a.Type, &a.Icon, &a.Color, &a.OpeningBalance, &a.Aliases, &a.Archived, &a.Sort, &a.LedgerID, &a.Balance, &a.TxCount)
 	return a, err
 }
 
 // ListAccounts mengembalikan semua akun beserta saldonya.
 func (s *Store) ListAccounts(ctx context.Context) ([]Account, error) {
-	rows, err := s.DB.QueryContext(ctx, balanceSQL+` ORDER BY a.archived, a.sort, a.id`)
+	rows, err := s.DB.QueryContext(ctx, balanceSQL+` WHERE a.ledger_id = ? ORDER BY a.archived, a.sort, a.id`, LedgerID(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +91,8 @@ func (s *Store) CreateAccount(ctx context.Context, a Account) (Account, error) {
 	if a.Sort == 0 {
 		s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort),0)+1 FROM accounts`).Scan(&a.Sort)
 	}
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO accounts (name, type, icon, color, opening_balance, aliases, archived, sort) VALUES (?,?,?,?,?,?,?,?)`,
-		a.Name, a.Type, a.Icon, a.Color, a.OpeningBalance, a.Aliases, a.Archived, a.Sort)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO accounts (name, type, icon, color, opening_balance, aliases, archived, sort, ledger_id) VALUES (?,?,?,?,?,?,?,?,?)`,
+		a.Name, a.Type, a.Icon, a.Color, a.OpeningBalance, a.Aliases, a.Archived, a.Sort, LedgerID(ctx))
 	if err != nil {
 		return a, err
 	}

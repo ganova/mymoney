@@ -233,6 +233,24 @@ func parseSegment(ctx context.Context, st *store.Store, c *Context, seg string) 
 		}
 	}
 
+	// sumber pemasukan dari kata kunci (mis. "gaji cmw", "freelance")
+	if d.Type == "income" {
+		bestLen := 0
+		for _, x := range c.Sources {
+			if x.Archived {
+				continue
+			}
+			for _, kw := range append([]string{strings.ToLower(x.Name)}, strings.Split(x.Keywords, ",")...) {
+				kw = strings.TrimSpace(kw)
+				if len(kw) > bestLen && containsWord(lower, kw) {
+					id := x.ID
+					d.IncomeSourceID = &id
+					bestLen = len(kw)
+				}
+			}
+		}
+	}
+
 	// aturan yang dipelajari
 	if d.Type != "transfer" {
 		if r := st.MatchRule(ctx, seg); r != nil && (r.Type == d.Type || r.Type == "") {

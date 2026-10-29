@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Report } from '../lib/types';
-  import { app, cat, acc, toastError } from '../lib/state.svelte';
+  import { app, cat, acc, source, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { back, go, route } from '../lib/router.svelte';
   import { rp, rpc, rpShort, markdown } from '../lib/format';
@@ -115,6 +115,22 @@
               <span class="ic">{cat(t.category_id)?.icon ?? '🧾'}</span>
               <span class="grow ellipsis">{t.description || 'Tanpa deskripsi'} {#if t.count > 1}<span class="muted tiny">×{t.count}</span>{/if}</span>
               <span class="num bold small">{rp(t.total)}</span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
+    {#if r.income_by_source?.length}
+      <section class="card">
+        <div class="card-title">Pemasukan per sumber</div>
+        <div class="stack top">
+          {#each r.income_by_source as s (s.source_id ?? 0)}
+            {@const x = source(s.source_id)}
+            <div class="row">
+              <span class="ic">{x?.icon ?? '💵'}</span>
+              <span class="grow">{x?.name ?? 'Tanpa sumber'} <span class="tiny muted">{s.count}x</span></span>
+              <span class="num small good">+{rp(s.total)}</span>
             </div>
           {/each}
         </div>

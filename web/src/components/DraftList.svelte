@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Draft, Transaction } from '../lib/types';
-  import { acc, cat, debt, changed, toast, toastError, haptic } from '../lib/state.svelte';
+  import { acc, anyAccount, cat, debt, source, changed, toast, toastError, haptic } from '../lib/state.svelte';
   import { api } from '../lib/api';
   import { rp, shortDate } from '../lib/format';
   import Sheet from './Sheet.svelte';
@@ -42,7 +42,7 @@
       const txs = await api.post<Transaction[]>('/transactions/bulk', {
         transactions: list.map((d) => ({
           date: d.date, type: d.type, amount: d.amount, account_id: d.account_id, to_account_id: d.to_account_id,
-          category_id: d.category_id, debt_id: d.debt_id, description: d.description, note: d.note, source: d.source, raw: d.raw ?? '',
+          category_id: d.category_id, debt_id: d.debt_id, income_source_id: d.income_source_id ?? null, description: d.description, note: d.note, source: d.source, raw: d.raw ?? '',
         })),
       });
       saved = txs;
@@ -74,7 +74,7 @@
     const d = drafts[editIndex];
     drafts[editIndex] = {
       ...d, type: tx.type as Draft['type'], amount: tx.amount, description: tx.description, category_id: tx.category_id,
-      account_id: tx.account_id, to_account_id: tx.to_account_id, debt_id: tx.debt_id, date: tx.date, note: tx.note,
+      account_id: tx.account_id, to_account_id: tx.to_account_id, debt_id: tx.debt_id, income_source_id: tx.income_source_id ?? null, date: tx.date, note: tx.note,
       amount_estimated: false, confidence: 1,
     };
     selected[editIndex] = tx.amount > 0;
@@ -90,9 +90,11 @@
 
   function sub(d: Draft): string {
     const parts: string[] = [];
-    if (d.type === 'transfer') parts.push(`${acc(d.account_id)?.name ?? '?'} → ${acc(d.to_account_id)?.name ?? '?'}`);
+    if (d.type === 'transfer') parts.push(`${acc(d.account_id)?.name ?? '?'} → ${anyAccount(d.to_account_id)?.name ?? '?'}`);
     else {
       const c = cat(d.category_id);
+      const s = source(d.income_source_id);
+      if (s) parts.push(s.name);
       if (c) parts.push(c.name);
       parts.push(acc(d.account_id)?.name ?? '?');
     }

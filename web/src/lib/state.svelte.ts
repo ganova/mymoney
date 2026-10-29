@@ -1,5 +1,5 @@
-import type { Account, Category, Debt, PeriodInfo, Settings, Transaction } from './types';
-import { api } from './api';
+import type { Account, Category, Debt, IncomeSource, Ledger, PeriodInfo, Settings, Transaction } from './types';
+import { api, setLedger } from './api';
 
 interface Bootstrap {
   settings: Settings;
@@ -9,6 +9,10 @@ interface Bootstrap {
   period: PeriodInfo;
   today: string;
   ai: { enabled: boolean; model: string; ocr: boolean };
+  ledgers: Ledger[];
+  ledger_id: number;
+  income_sources: IncomeSource[];
+  other_accounts: Account[];
   auth_required: boolean;
   version: string;
 }
@@ -17,6 +21,11 @@ export const app = $state({
   ready: false,
   authRequired: false,
   authenticated: false,
+  ledgers: [] as Ledger[],
+  ledgerId: 0,
+  incomeSources: [] as IncomeSource[],
+  /** akun di buku lain, hanya untuk tujuan transfer antar buku */
+  otherAccounts: [] as Account[],
   error: '',
   settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, owner_name: '' } as Settings,
   accounts: [] as Account[],
@@ -68,6 +77,11 @@ export async function loadBootstrap(): Promise<void> {
   app.period = b.period;
   app.today = b.today;
   app.ai = b.ai;
+  app.ledgers = b.ledgers;
+  app.ledgerId = b.ledger_id;
+  setLedger(b.ledger_id);
+  app.incomeSources = b.income_sources;
+  app.otherAccounts = b.other_accounts;
   app.authRequired = b.auth_required;
   app.version = b.version;
   app.authenticated = true;
@@ -77,17 +91,44 @@ export async function loadBootstrap(): Promise<void> {
 export async function changed(): Promise<void> {
   app.dataVersion++;
   try {
-    const [accounts, categories, debts] = await Promise.all([
+    const [accounts, categories, debts, sources] = await Promise.all([
       api.get<Account[]>('/accounts'),
       api.get<Category[]>('/categories'),
       api.get<Debt[]>('/debts'),
+      api.get<IncomeSource[]>('/income-sources'),
     ]);
+    app.incomeSources = sources;
     app.accounts = accounts;
     app.categories = categories;
     app.debts = debts;
   } catch {
     /* abaikan; halaman akan menampilkan error sendiri */
   }
+}
+
+/** Pindah buku keuangan (Pribadi/Work) lalu muat ulang seluruh data. */
+export async function switchLedger(id: number): Promise<void> {
+  if (id === app.ledgerId) return;
+  setLedger(id);
+  try {
+    await loadBootstrap();
+    app.dataVersion++;
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+export function source(id: number | null | undefined): IncomeSource | undefined {
+  return id ? app.incomeSources.find((s) => s.id === id) : undefined;
+}
+
+/** Akun dari buku mana pun (untuk menampilkan tujuan transfer antar buku). */
+export function anyAccount(id: number | null | undefined): Account | undefined {
+  return id ? (app.accounts.find((a) => a.id === id) ?? app.otherAccounts.find((a) => a.id === id)) : undefined;
+}
+
+export function ledgerName(id: number): string {
+  return app.ledgers.find((l) => l.id === id)?.name ?? '';
 }
 
 export function acc(id: number | null | undefined): Account | undefined {

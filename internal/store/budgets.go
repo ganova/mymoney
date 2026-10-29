@@ -30,10 +30,10 @@ func (s *Store) ListBudgets(ctx context.Context, p period.Period) ([]Budget, err
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT b.id, b.period, b.category_id, b.amount, b.due_day, b.account_id, b.note, c.kind,
   COALESCE((SELECT SUM(t.amount) FROM transactions t
-            WHERE t.category_id = b.category_id AND t.type = c.kind AND t.date BETWEEN ? AND ?), 0)
+            WHERE t.ledger_id = b.ledger_id AND t.category_id = b.category_id AND t.type = c.kind AND t.date BETWEEN ? AND ?), 0)
 FROM budgets b JOIN categories c ON c.id = b.category_id
-WHERE b.period = ?
-ORDER BY c.kind DESC, c.sort, c.id`, p.StartStr(), p.EndStr(), p.Key)
+WHERE b.period = ? AND b.ledger_id = ?
+ORDER BY c.kind DESC, c.sort, c.id`, p.StartStr(), p.EndStr(), p.Key, LedgerID(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func dueDate(p period.Period, day int) string {
 // HasBudget melaporkan apakah periode sudah punya baris budget.
 func (s *Store) HasBudget(ctx context.Context, key string) (bool, error) {
 	var n int
-	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM budgets WHERE period = ?`, key).Scan(&n)
+	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM budgets WHERE period = ? AND ledger_id = ?`, key, LedgerID(ctx)).Scan(&n)
 	return n > 0, err
 }
 
@@ -89,7 +89,7 @@ func (s *Store) EnsureBudget(ctx context.Context, p period.Period) (bool, error)
 		return false, err
 	}
 	var src string
-	err = s.DB.QueryRowContext(ctx, `SELECT period FROM budgets WHERE period < ? ORDER BY period DESC LIMIT 1`, p.Key).Scan(&src)
+	err = s.DB.QueryRowContext(ctx, `SELECT period FROM budgets WHERE period < ? AND ledger_id = ? ORDER BY period DESC LIMIT 1`, p.Key, LedgerID(ctx)).Scan(&src)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -103,14 +103,14 @@ func (s *Store) EnsureBudget(ctx context.Context, p period.Period) (bool, error)
 // CopyBudget menyalin baris budget dari satu periode ke periode lain.
 // Bila overwrite=false, kategori yang sudah ada di tujuan tidak diubah.
 func (s *Store) CopyBudget(ctx context.Context, from, to string, overwrite bool) (int64, error) {
-	q := `INSERT INTO budgets (period, category_id, amount, due_day, account_id, note)
-		SELECT ?, category_id, amount, due_day, account_id, note FROM budgets WHERE period = ?`
+	q := `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, account_id, note)
+		SELECT ledger_id, ?, category_id, amount, due_day, account_id, note FROM budgets WHERE period = ? AND ledger_id = ?`
 	if overwrite {
-		q += ` ON CONFLICT(period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note`
+		q += ` ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note`
 	} else {
-		q += ` ON CONFLICT(period, category_id) DO NOTHING`
+		q += ` ON CONFLICT(ledger_id, period, category_id) DO NOTHING`
 	}
-	res, err := s.DB.ExecContext(ctx, q, to, from)
+	res, err := s.DB.ExecContext(ctx, q, to, from, LedgerID(ctx))
 	if err != nil {
 		return 0, err
 	}
@@ -131,20 +131,20 @@ func (s *Store) UpsertBudget(ctx context.Context, b Budget) (Budget, error) {
 	if b.DueDay < 0 || b.DueDay > 31 {
 		return b, invalid("tanggal jatuh tempo harus 1–31")
 	}
-	err := s.DB.QueryRowContext(ctx, `INSERT INTO budgets (period, category_id, amount, due_day, account_id, note) VALUES (?,?,?,?,?,?)
-		ON CONFLICT(period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note
-		RETURNING id`, b.Period, b.CategoryID, b.Amount, b.DueDay, nullInt(b.AccountID), b.Note).Scan(&b.ID)
+	err := s.DB.QueryRowContext(ctx, `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, account_id, note) VALUES (?,?,?,?,?,?,?)
+		ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note
+		RETURNING id`, LedgerID(ctx), b.Period, b.CategoryID, b.Amount, b.DueDay, nullInt(b.AccountID), b.Note).Scan(&b.ID)
 	return b, err
 }
 
 // DeleteBudget menghapus satu baris budget.
 func (s *Store) DeleteBudget(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM budgets WHERE id = ?`, id)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM budgets WHERE id = ? AND ledger_id = ?`, id, LedgerID(ctx))
 	return err
 }
 
 // ClearBudget menghapus seluruh budget pada periode.
 func (s *Store) ClearBudget(ctx context.Context, key string) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM budgets WHERE period = ?`, key)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM budgets WHERE period = ? AND ledger_id = ?`, key, LedgerID(ctx))
 	return err
 }

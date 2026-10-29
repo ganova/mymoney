@@ -186,3 +186,8 @@ Struktur: `cmd/mymoney` (main), `internal/*` (backend), `web/src` (frontend: `pa
 
 ## AI lewat Codex CLI (tanpa API key)
 Pasang Codex CLI di PC (`npm i -g @openai/codex`, lalu `codex login`). Bila `ANTHROPIC_API_KEY` kosong, MyMoney otomatis memakai `codex exec` untuk membaca kalimat, screenshot, dan tanya-jawab (memakai kuota langganan ChatGPT). Atur dengan `AI_PROVIDER` (`auto`/`codex`/`offline`), `CODEX_PATH`, `CODEX_MODEL`. PDF tetap dibaca offline; saran budget & analisis butuh API key. Bila Codex gagal, aplikasi kembali ke parser offline.
+
+## Dua buku (Pribadi & Work) dan sumber pemasukan
+- Tombol **Pribadi | Work** di atas aplikasi memilih buku keuangan. Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri; data lama otomatis masuk ke Pribadi. Transfer antar buku (mis. Work → Pribadi) dicatat lewat jenis *Transfer*.
+- Pemasukan bisa diberi **sumber** (bawaan: CMW dan Freelance; kelola di Lainnya → Sumber Pemasukan & Buku). AI, parser offline, dan Codex mengisinya dari kata kunci; Beranda dan Laporan menampilkan total per sumber.
+- iPhone Shortcut: tambahkan `?ledger=2` pada URL (atau header `X-Ledger: 2`) untuk mencatat ke buku Work; tanpa itu masuk ke Pribadi.

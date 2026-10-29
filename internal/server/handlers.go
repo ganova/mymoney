@@ -37,17 +37,133 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	ledgers, err := s.store.ListLedgers(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	sources, err := s.store.ListIncomeSources(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	// akun di buku lain: hanya untuk tujuan transfer antar buku
+	otherAccs := []store.Account{}
+	for _, l := range ledgers {
+		if l.ID == store.LedgerID(ctx) {
+			continue
+		}
+		list, err := s.store.ListAccounts(store.WithLedger(ctx, l.ID))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		for _, a := range list {
+			if !a.Archived {
+				otherAccs = append(otherAccs, a)
+			}
+		}
+	}
 	writeJSON(w, 200, map[string]any{
-		"settings":      st,
-		"accounts":      accs,
-		"categories":    cats,
-		"debts":         debts,
-		"period":        cur.Info(),
-		"today":         s.store.Today().Format("2006-01-02"),
-		"ai":            map[string]any{"enabled": s.ai.Enabled(), "model": s.ai.Model(), "ocr": ocr.Available()},
-		"auth_required": s.authRequired(),
-		"version":       Version,
+		"ledgers":        ledgers,
+		"ledger_id":      store.LedgerID(ctx),
+		"income_sources": sources,
+		"other_accounts": otherAccs,
+		"settings":       st,
+		"accounts":       accs,
+		"categories":     cats,
+		"debts":          debts,
+		"period":         cur.Info(),
+		"today":          s.store.Today().Format("2006-01-02"),
+		"ai":             map[string]any{"enabled": s.ai.Enabled(), "model": s.ai.Model(), "ocr": ocr.Available()},
+		"auth_required":  s.authRequired(),
+		"version":        Version,
 	})
+}
+
+func (s *Server) handleListLedgers(w http.ResponseWriter, r *http.Request) {
+	l, err := s.store.ListLedgers(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, l)
+}
+
+func (s *Server) handleUpdateLedger(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	var in store.Ledger
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	in.ID = id
+	l, err := s.store.UpdateLedger(r.Context(), in)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, l)
+}
+
+func (s *Server) handleListSources(w http.ResponseWriter, r *http.Request) {
+	l, err := s.store.ListIncomeSources(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, l)
+}
+
+func (s *Server) handleCreateSource(w http.ResponseWriter, r *http.Request) {
+	var in store.IncomeSource
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	x, err := s.store.CreateIncomeSource(r.Context(), in)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 201, x)
+}
+
+func (s *Server) handleUpdateSource(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	var in store.IncomeSource
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	in.ID = id
+	x, err := s.store.UpdateIncomeSource(r.Context(), in)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, x)
+}
+
+func (s *Server) handleDeleteSource(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.store.DeleteIncomeSource(r.Context(), id); err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {

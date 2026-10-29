@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Dashboard, Budget } from '../lib/types';
-  import { app, ui, cat, openTx, toastError } from '../lib/state.svelte';
+  import { app, ui, cat, source, openTx, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { go } from '../lib/router.svelte';
   import { rp, rpc, pct, greeting, shortDate, markdown } from '../lib/format';
@@ -174,6 +174,22 @@
       </div>
     </section>
 
+    {#if d.income_by_source?.length}
+      <section class="card">
+        <div class="card-title">Pemasukan per sumber</div>
+        <div class="stack top">
+          {#each d.income_by_source as s (s.source_id ?? 0)}
+            {@const x = source(s.source_id)}
+            <div class="row">
+              <span class="ic">{x?.icon ?? '💵'}</span>
+              <span class="grow">{x?.name ?? 'Tanpa sumber'} <span class="tiny muted">{s.count}x</span></span>
+              <span class="num small good">+{rp(s.total)}</span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
     {#if d.alerts.length}
       <section class="stack alerts">
         {#each d.alerts as a, i (i)}
@@ -288,6 +304,8 @@
 </div>
 
 <style>
+  .ic { width: 22px; text-align: center; flex: none; }
+  .top { gap: 10px; }
   .head { align-items: flex-start; }
   .pchip { gap: 0; margin-left: -10px; }
   .icon-btn.sm { width: 32px; height: 36px; }

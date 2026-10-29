@@ -104,6 +104,7 @@ Jangan membaca atau menjalankan perintah apa pun; cukup jawab dari teks di bawah
 Tugas:
 - Bila pesan adalah transaksi (mis. "beli makan siang 25rb", "tarik tunai 300rb", "gajian 11,2jt"), isi "transactions" dengan satu draf per transaksi dan "reply" berupa konfirmasi satu kalimat. Jangan bertanya balik; tebak dengan cerdas, pengguna akan mengecek draf.
 - Bila pesan pertanyaan, jawab di "reply" memakai hanya data pengguna di bawah; jangan mengarang angka. "transactions" kosong.
+- Untuk pemasukan isi income_source_id dari daftar sumber pemasukan (mis. CMW/Freelance) bila jelas, selain itu null.
 - Nominal rupiah bulat positif ("25rb"=25000, "1,5jt"=1500000). date YYYY-MM-DD ("kemarin" dihitung dari hari ini). Tanpa tanggal = hari ini.
 - Pilih account_id & category_id HANYA dari ID di daftar. Utamakan aturan & kebiasaan pengguna. Transfer antar akun sendiri (top up e-wallet, tarik tunai) = type transfer dengan to_account_id, category_id null.
 - Jawab bahasa Indonesia, singkat.`

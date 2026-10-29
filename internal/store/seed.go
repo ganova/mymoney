@@ -83,7 +83,7 @@ func (s *Store) seed(ctx context.Context) error {
 		}
 	}
 	for i, c := range seedCategories {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO categories (name, kind, grp, icon, keywords, sort) VALUES (?,?,?,?,?,?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT INTO categories (name, kind, grp, icon, keywords, sort, ledger_id) VALUES (?,?,?,?,?,?,1)`,
 			c.name, c.kind, c.grp, c.icon, c.keywords, i); err != nil {
 			return err
 		}

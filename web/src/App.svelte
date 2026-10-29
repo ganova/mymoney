@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { app, bootstrap } from './lib/state.svelte';
   import { route } from './lib/router.svelte';
+  import LedgerBar from './components/LedgerBar.svelte';
   import TabBar from './components/TabBar.svelte';
   import Toast from './components/Toast.svelte';
   import TxEditor from './components/TxEditor.svelte';
@@ -16,6 +17,7 @@
   import Reports from './pages/Reports.svelte';
   import ImportPage from './pages/Import.svelte';
   import SettingsPage from './pages/Settings.svelte';
+  import SourcesPage from './pages/Sources.svelte';
 
   onMount(bootstrap);
 
@@ -31,6 +33,7 @@
     '/reports': Reports,
     '/import': ImportPage,
     '/settings': SettingsPage,
+    '/sources': SourcesPage,
   };
   const Page = $derived(pages[route.path] ?? Home);
 </script>
@@ -46,7 +49,8 @@
     </div>
   </div>
 {:else}
-  {#key route.path}
+  <LedgerBar />
+  {#key route.path + ':' + app.ledgerId}
     <Page />
   {/key}
   <TabBar />
@@ -55,6 +59,8 @@
 <Toast />
 
 <style>
+  /* bilah buku sudah menangani area aman atas */
+  :global(.ledger-bar ~ .page) { padding-top: 8px; min-height: calc(100dvh - 56px); }
   .splash { min-height: 100dvh; display: grid; place-items: center; }
   .logo { font-size: 56px; animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 50% { transform: scale(0.9); opacity: 0.6; } }

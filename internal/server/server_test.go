@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -198,5 +199,42 @@ func TestBudgetApplyAndStatic(t *testing.T) {
 	}
 	if code, _ := c.do("GET", "/api/tidak-ada", nil); code != 404 {
 		t.Fatalf("unknown api %d", code)
+	}
+}
+
+func TestLedgerHeader(t *testing.T) {
+	c, _ := newTestServer(t, "")
+	var pribadi, work struct {
+		LedgerID int64           `json:"ledger_id"`
+		Accounts []store.Account `json:"accounts"`
+		Sources  []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		} `json:"income_sources"`
+		Other []store.Account `json:"other_accounts"`
+	}
+	c.json("GET", "/api/bootstrap", nil, &pribadi)
+	code, out := c.do("GET", "/api/bootstrap", nil, "X-Ledger", "2")
+	if code != 200 || json.Unmarshal(out, &work) != nil {
+		t.Fatalf("bootstrap work: %d %s", code, out)
+	}
+	if pribadi.LedgerID != 1 || work.LedgerID != 2 {
+		t.Fatalf("buku aktif: %d / %d", pribadi.LedgerID, work.LedgerID)
+	}
+	if len(work.Accounts) != 2 || work.Accounts[0].LedgerID != 2 || len(work.Other) != len(pribadi.Accounts) {
+		t.Fatalf("akun Work/other: %+v %d", work.Accounts, len(work.Other))
+	}
+	if len(work.Sources) < 2 {
+		t.Fatalf("sumber pemasukan: %+v", work.Sources)
+	}
+	// catat via kalimat di buku Work: pemasukan freelance mengenali sumbernya
+	code, out = c.do("POST", "/api/ai/ask", map[string]string{"text": "terima proyek freelance 3jt"}, "X-Ledger", "2")
+	if code != 200 || !strings.Contains(string(out), `"income_source_id":`+strconv.FormatInt(work.Sources[1].ID, 10)) {
+		t.Fatalf("ask work: %d %s", code, out)
+	}
+	// akun buku Pribadi ditolak di buku Work
+	code, _ = c.do("POST", "/api/transactions", map[string]any{"type": "expense", "amount": 1000, "account_id": pribadi.Accounts[0].ID}, "X-Ledger", "2")
+	if code != 400 {
+		t.Fatalf("akun lintas buku harus ditolak: %d", code)
 	}
 }

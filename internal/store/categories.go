@@ -30,7 +30,7 @@ func scanCategory(sc interface{ Scan(...any) error }) (Category, error) {
 
 // ListCategories mengembalikan semua kategori.
 func (s *Store) ListCategories(ctx context.Context) ([]Category, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+categoryCols+` FROM categories ORDER BY archived, kind DESC, sort, id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+categoryCols+` FROM categories WHERE ledger_id IN (0, ?) ORDER BY archived, kind DESC, sort, id`, LedgerID(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +85,14 @@ func (s *Store) CreateCategory(ctx context.Context, c Category) (Category, error
 	}
 	// hindari duplikat nama
 	var existing int64
-	if err := s.DB.QueryRowContext(ctx, `SELECT id FROM categories WHERE lower(name) = lower(?) AND kind = ? AND archived = 0`, c.Name, c.Kind).Scan(&existing); err == nil {
+	if err := s.DB.QueryRowContext(ctx, `SELECT id FROM categories WHERE lower(name) = lower(?) AND kind = ? AND archived = 0 AND ledger_id IN (0, ?)`, c.Name, c.Kind, LedgerID(ctx)).Scan(&existing); err == nil {
 		return s.GetCategory(ctx, existing)
 	}
 	if c.Sort == 0 {
 		s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort),0)+1 FROM categories`).Scan(&c.Sort)
 	}
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO categories (name, kind, grp, icon, color, keywords, archived, sort) VALUES (?,?,?,?,?,?,?,?)`,
-		c.Name, c.Kind, c.Group, c.Icon, c.Color, c.Keywords, c.Archived, c.Sort)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO categories (name, kind, grp, icon, color, keywords, archived, sort, ledger_id) VALUES (?,?,?,?,?,?,?,?,?)`,
+		c.Name, c.Kind, c.Group, c.Icon, c.Color, c.Keywords, c.Archived, c.Sort, LedgerID(ctx))
 	if err != nil {
 		return c, err
 	}

@@ -7,8 +7,29 @@ export class ApiError extends Error {
   }
 }
 
+/** Buku keuangan aktif (Pribadi/Work), dikirim ke server di setiap permintaan. */
+const LEDGER_KEY = 'mymoney.ledger';
+let ledgerId = 0;
+try {
+  ledgerId = Number(localStorage.getItem(LEDGER_KEY)) || 0;
+} catch {
+  /* penyimpanan diblokir; pakai default */
+}
+export function getLedger(): number {
+  return ledgerId;
+}
+export function setLedger(id: number): void {
+  ledgerId = id;
+  try {
+    localStorage.setItem(LEDGER_KEY, String(id));
+  } catch {
+    /* abaikan */
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', signal, headers: {} };
+  if (ledgerId > 0) (init.headers as Record<string, string>)['X-Ledger'] = String(ledgerId);
   if (body instanceof FormData) {
     init.body = body;
   } else if (body !== undefined) {

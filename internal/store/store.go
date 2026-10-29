@@ -189,6 +189,53 @@ CREATE TABLE insights (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+	// v2: dua buku keuangan (Pribadi/Work) dan sumber pemasukan
+	`
+CREATE TABLE ledgers (
+  id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO ledgers (id, name, icon, sort) VALUES (1, 'Pribadi', '👤', 1), (2, 'Work', '💼', 2);
+
+CREATE TABLE income_sources (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  name     TEXT NOT NULL,
+  icon     TEXT NOT NULL DEFAULT '',
+  keywords TEXT NOT NULL DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0,
+  sort     INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO income_sources (name, icon, keywords, sort) VALUES
+  ('CMW', '🏢', 'cmw,gaji cmw,kantor', 1),
+  ('Freelance', '🧑‍💻', 'freelance,fl,proyek,project,klien,client', 2);
+
+ALTER TABLE accounts   ADD COLUMN ledger_id INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE categories ADD COLUMN ledger_id INTEGER NOT NULL DEFAULT 0;
+UPDATE categories SET ledger_id = 1;
+ALTER TABLE debts      ADD COLUMN ledger_id INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE transactions ADD COLUMN ledger_id INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE transactions ADD COLUMN income_source_id INTEGER REFERENCES income_sources(id) ON DELETE SET NULL;
+UPDATE transactions SET ledger_id = COALESCE((SELECT a.ledger_id FROM accounts a WHERE a.id = transactions.account_id), 1);
+CREATE INDEX idx_tx_ledger ON transactions(ledger_id, date);
+
+CREATE TABLE budgets_new (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id   INTEGER NOT NULL DEFAULT 1,
+  period      TEXT NOT NULL,
+  category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  amount      INTEGER NOT NULL DEFAULT 0,
+  due_day     INTEGER NOT NULL DEFAULT 0,
+  account_id  INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  note        TEXT NOT NULL DEFAULT '',
+  UNIQUE (ledger_id, period, category_id)
+);
+INSERT INTO budgets_new (id, ledger_id, period, category_id, amount, due_day, account_id, note)
+  SELECT id, 1, period, category_id, amount, due_day, account_id, note FROM budgets;
+DROP TABLE budgets;
+ALTER TABLE budgets_new RENAME TO budgets;
+`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {
@@ -223,9 +270,11 @@ func (s *Store) migrate(ctx context.Context) error {
 		}
 	}
 	if fresh {
-		return s.seed(ctx)
+		if err := s.seed(ctx); err != nil {
+			return err
+		}
 	}
-	return nil
+	return s.seedWork(ctx)
 }
 
 // nullInt mengubah 0 menjadi NULL.

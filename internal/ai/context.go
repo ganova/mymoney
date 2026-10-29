@@ -22,6 +22,7 @@ type Draft struct {
 	AccountID       int64   `json:"account_id"`
 	ToAccountID     *int64  `json:"to_account_id"`
 	DebtID          *int64  `json:"debt_id"`
+	IncomeSourceID  *int64  `json:"income_source_id"`
 	Note            string  `json:"note"`
 	Raw             string  `json:"raw,omitempty"`
 	Confidence      float64 `json:"confidence"`
@@ -34,7 +35,7 @@ type Draft struct {
 func (d Draft) Transaction() store.Transaction {
 	return store.Transaction{
 		Date: d.Date, Type: d.Type, Amount: d.Amount, AccountID: d.AccountID,
-		ToAccountID: d.ToAccountID, CategoryID: d.CategoryID, DebtID: d.DebtID,
+		ToAccountID: d.ToAccountID, CategoryID: d.CategoryID, DebtID: d.DebtID, IncomeSourceID: d.IncomeSourceID,
 		Description: d.Description, Note: d.Note, Source: d.Source, Raw: d.Raw,
 	}
 }
@@ -55,10 +56,11 @@ func draftSchema(withRaw bool) map[string]any {
 		"account_id":       map[string]any{"type": "integer", "description": "ID akun sumber (yang dipotong / yang menerima untuk income)"},
 		"to_account_id":    nullableInt("ID akun tujuan, hanya untuk transfer"),
 		"debt_id":          nullableInt("ID utang bila ini pembayaran cicilan/paylater yang terdaftar"),
+		"income_source_id": nullableInt("ID sumber pemasukan (mis. CMW/Freelance) untuk type income; null bila bukan income atau tidak jelas"),
 		"note":             map[string]any{"type": "string", "description": "Catatan tambahan (boleh kosong)"},
 		"confidence":       map[string]any{"type": "number", "description": "Keyakinan 0..1 atas kategori, akun, dan nominal"},
 	}
-	required := []string{"type", "amount", "amount_estimated", "date", "description", "category_id", "account_id", "to_account_id", "debt_id", "note", "confidence"}
+	required := []string{"type", "amount", "amount_estimated", "date", "description", "category_id", "account_id", "to_account_id", "debt_id", "income_source_id", "note", "confidence"}
 	if withRaw {
 		props["raw"] = map[string]any{"type": "string", "description": "Teks asli baris transaksi seperti tertulis di sumber"}
 		required = append(required, "raw")
@@ -74,12 +76,15 @@ type Context struct {
 	Accounts   []store.Account
 	Categories []store.Category
 	Debts      []store.Debt
+	Ledger     store.Ledger
+	Sources    []store.IncomeSource
 	Rules      []store.Rule
 	Habits     []store.Habit
 
 	accByID map[int64]store.Account
 	catByID map[int64]store.Category
 	debtIDs map[int64]bool
+	srcIDs  map[int64]bool
 }
 
 var hari = [...]string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
@@ -100,6 +105,22 @@ func LoadContext(ctx context.Context, st *store.Store) (*Context, error) {
 	}
 	if c.Debts, err = st.ListDebts(ctx); err != nil {
 		return nil, err
+	}
+	if ls, err := st.ListLedgers(ctx); err == nil {
+		for _, l := range ls {
+			if l.ID == store.LedgerID(ctx) {
+				c.Ledger = l
+			}
+		}
+	}
+	if c.Sources, err = st.ListIncomeSources(ctx); err != nil {
+		return nil, err
+	}
+	c.srcIDs = map[int64]bool{}
+	for _, x := range c.Sources {
+		if !x.Archived {
+			c.srcIDs[x.ID] = true
+		}
 	}
 	if c.Rules, err = st.ListRules(ctx, 80); err != nil {
 		return nil, err
@@ -152,6 +173,10 @@ func (c *Context) Describe() string {
 		fmt.Fprintf(&b, "Nama pengguna: %s.\n", c.Settings.OwnerName)
 	}
 
+	if c.Ledger.Name != "" {
+		fmt.Fprintf(&b, "Buku keuangan aktif: %s. Pengguna punya dua buku terpisah (Pribadi dan Work); semua data di bawah hanya milik buku %s.\n", c.Ledger.Name, c.Ledger.Name)
+	}
+
 	b.WriteString("\n## Akun (kas/dompet)\n")
 	for _, a := range c.Accounts {
 		if a.Archived {
@@ -179,6 +204,15 @@ func (c *Context) Describe() string {
 			kw = "; kata kunci: " + x.Keywords
 		}
 		fmt.Fprintf(&b, "- id=%d %s (%s)%s\n", x.ID, x.Name, x.Kind, kw)
+	}
+
+	if len(c.srcIDs) > 0 {
+		b.WriteString("\n## Sumber pemasukan (untuk type income, isi income_source_id)\n")
+		for _, x := range c.Sources {
+			if !x.Archived {
+				fmt.Fprintf(&b, "- id=%d %s; kata kunci: %s\n", x.ID, x.Name, x.Keywords)
+			}
+		}
 	}
 
 	active := 0
@@ -271,13 +305,16 @@ func (c *Context) Sanitize(d Draft, source string) Draft {
 	if d.CategoryID == nil && d.Type != "transfer" {
 		// pakai kategori "Lain-lain" / "Pemasukan Lain" sebagai cadangan
 		for _, x := range c.Categories {
-			if x.Kind == d.Type && !x.Archived && (x.Name == "Lain-lain" || x.Name == "Pemasukan Lain") {
+			if x.Kind == d.Type && !x.Archived && (x.Name == "Lain-lain" || x.Name == "Pemasukan Lain" || x.Name == "Lain-lain Work" || x.Name == "Pemasukan Work Lain") {
 				id := x.ID
 				d.CategoryID = &id
 				d.Confidence = min(d.Confidence, 0.5)
 				break
 			}
 		}
+	}
+	if d.IncomeSourceID != nil && (d.Type != "income" || !c.srcIDs[*d.IncomeSourceID]) {
+		d.IncomeSourceID = nil
 	}
 	if d.DebtID != nil && (!c.debtIDs[*d.DebtID] || d.Type != "expense") {
 		d.DebtID = nil

@@ -24,20 +24,23 @@ type Transaction struct {
 	ToAccountID *int64 `json:"to_account_id"`
 	CategoryID  *int64 `json:"category_id"`
 	DebtID      *int64 `json:"debt_id"`
-	Description string `json:"description"`
-	Note        string `json:"note"`
-	Source      string `json:"source"`
-	Raw         string `json:"raw,omitempty"`
-	CreatedAt   string `json:"created_at"`
+	// IncomeSourceID: sumber pemasukan (mis. CMW / Freelance), hanya untuk income.
+	IncomeSourceID *int64 `json:"income_source_id"`
+	LedgerID       int64  `json:"ledger_id"`
+	Description    string `json:"description"`
+	Note           string `json:"note"`
+	Source         string `json:"source"`
+	Raw            string `json:"raw,omitempty"`
+	CreatedAt      string `json:"created_at"`
 }
 
-const txCols = `id, date, type, amount, account_id, to_account_id, category_id, debt_id, description, note, source, raw, created_at`
+const txCols = `id, date, type, amount, account_id, to_account_id, category_id, debt_id, income_source_id, ledger_id, description, note, source, raw, created_at`
 
 func scanTx(sc interface{ Scan(...any) error }) (Transaction, error) {
 	var t Transaction
-	var to, cat, debt sql.NullInt64
-	err := sc.Scan(&t.ID, &t.Date, &t.Type, &t.Amount, &t.AccountID, &to, &cat, &debt, &t.Description, &t.Note, &t.Source, &t.Raw, &t.CreatedAt)
-	t.ToAccountID, t.CategoryID, t.DebtID = ptr(to), ptr(cat), ptr(debt)
+	var to, cat, debt, isrc sql.NullInt64
+	err := sc.Scan(&t.ID, &t.Date, &t.Type, &t.Amount, &t.AccountID, &to, &cat, &debt, &isrc, &t.LedgerID, &t.Description, &t.Note, &t.Source, &t.Raw, &t.CreatedAt)
+	t.ToAccountID, t.CategoryID, t.DebtID, t.IncomeSourceID = ptr(to), ptr(cat), ptr(debt), ptr(isrc)
 	return t, err
 }
 
@@ -64,9 +67,14 @@ func (s *Store) validate(ctx context.Context, t *Transaction) error {
 	default:
 		return invalid("jenis transaksi tidak dikenal: %s", t.Type)
 	}
-	if _, err := s.GetAccount(ctx, t.AccountID); err != nil {
+	acc, err := s.GetAccount(ctx, t.AccountID)
+	if err != nil {
 		return invalid("akun tidak ditemukan")
 	}
+	if acc.LedgerID != LedgerID(ctx) {
+		return invalid("akun %s bukan bagian dari buku ini", acc.Name)
+	}
+	t.LedgerID = acc.LedgerID
 	if t.Type == "transfer" {
 		if t.ToAccountID == nil || *t.ToAccountID == 0 {
 			return invalid("transfer butuh akun tujuan")
@@ -109,6 +117,16 @@ func (s *Store) validate(ctx context.Context, t *Transaction) error {
 			return invalid("utang tidak ditemukan")
 		}
 	}
+	if t.IncomeSourceID != nil && (*t.IncomeSourceID == 0 || t.Type != "income") {
+		t.IncomeSourceID = nil
+	}
+	if t.IncomeSourceID != nil {
+		var n int
+		s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM income_sources WHERE id = ?`, *t.IncomeSourceID).Scan(&n)
+		if n == 0 {
+			return invalid("sumber pemasukan tidak ditemukan")
+		}
+	}
 	t.Description = strings.TrimSpace(t.Description)
 	if len(t.Description) > 200 {
 		t.Description = t.Description[:200]
@@ -125,9 +143,9 @@ func (s *Store) CreateTransaction(ctx context.Context, t Transaction) (Transacti
 	if err := s.validate(ctx, &t); err != nil {
 		return t, err
 	}
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO transactions (date, type, amount, account_id, to_account_id, category_id, debt_id, description, note, source, raw)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), t.Description, t.Note, t.Source, t.Raw)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO transactions (date, type, amount, account_id, to_account_id, category_id, debt_id, income_source_id, ledger_id, description, note, source, raw)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), nullInt(t.IncomeSourceID), t.LedgerID, t.Description, t.Note, t.Source, t.Raw)
 	if err != nil {
 		return t, err
 	}
@@ -150,9 +168,9 @@ func (s *Store) CreateTransactions(ctx context.Context, list []Transaction) ([]T
 	defer tx.Rollback()
 	ids := make([]int64, 0, len(list))
 	for _, t := range list {
-		res, err := tx.ExecContext(ctx, `INSERT INTO transactions (date, type, amount, account_id, to_account_id, category_id, debt_id, description, note, source, raw)
-			VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-			t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), t.Description, t.Note, t.Source, t.Raw)
+		res, err := tx.ExecContext(ctx, `INSERT INTO transactions (date, type, amount, account_id, to_account_id, category_id, debt_id, income_source_id, ledger_id, description, note, source, raw)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), nullInt(t.IncomeSourceID), t.LedgerID, t.Description, t.Note, t.Source, t.Raw)
 		if err != nil {
 			return nil, err
 		}
@@ -198,8 +216,8 @@ func (s *Store) UpdateTransaction(ctx context.Context, t Transaction) (Transacti
 	if err := s.validate(ctx, &t); err != nil {
 		return t, err
 	}
-	_, err = s.DB.ExecContext(ctx, `UPDATE transactions SET date=?, type=?, amount=?, account_id=?, to_account_id=?, category_id=?, debt_id=?, description=?, note=?, source=?, raw=?, updated_at=datetime('now') WHERE id=?`,
-		t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), t.Description, t.Note, t.Source, t.Raw, t.ID)
+	_, err = s.DB.ExecContext(ctx, `UPDATE transactions SET date=?, type=?, amount=?, account_id=?, to_account_id=?, category_id=?, debt_id=?, income_source_id=?, ledger_id=?, description=?, note=?, source=?, raw=?, updated_at=datetime('now') WHERE id=?`,
+		t.Date, t.Type, t.Amount, t.AccountID, nullInt(t.ToAccountID), nullInt(t.CategoryID), nullInt(t.DebtID), nullInt(t.IncomeSourceID), t.LedgerID, t.Description, t.Note, t.Source, t.Raw, t.ID)
 	if err != nil {
 		return t, err
 	}
@@ -239,7 +257,7 @@ type TxFilter struct {
 
 // ListTransactions mencari transaksi sesuai filter, terbaru dahulu.
 func (s *Store) ListTransactions(ctx context.Context, f TxFilter) ([]Transaction, error) {
-	where, args := []string{"1=1"}, []any{}
+	where, args := []string{"(ledger_id = ? OR to_account_id IN (SELECT id FROM accounts WHERE ledger_id = ?))"}, []any{LedgerID(ctx), LedgerID(ctx)}
 	if f.From != "" {
 		where, args = append(where, "date >= ?"), append(args, f.From)
 	}
@@ -294,8 +312,8 @@ func (s *Store) FindDuplicate(ctx context.Context, t Transaction) int64 {
 	from := d.AddDate(0, 0, -2).Format("2006-01-02")
 	to := d.AddDate(0, 0, 2).Format("2006-01-02")
 	var id int64
-	err = s.DB.QueryRowContext(ctx, `SELECT id FROM transactions WHERE account_id = ? AND type = ? AND amount = ? AND date BETWEEN ? AND ?
-		ORDER BY abs(julianday(date) - julianday(?)) LIMIT 1`, t.AccountID, t.Type, t.Amount, from, to, t.Date).Scan(&id)
+	err = s.DB.QueryRowContext(ctx, `SELECT id FROM transactions WHERE ledger_id = ? AND account_id = ? AND type = ? AND amount = ? AND date BETWEEN ? AND ?
+		ORDER BY abs(julianday(date) - julianday(?)) LIMIT 1`, LedgerID(ctx), t.AccountID, t.Type, t.Amount, from, to, t.Date).Scan(&id)
 	if err != nil {
 		return 0
 	}
@@ -323,10 +341,10 @@ SELECT description, type, category_id, account_id, to_account_id, COUNT(*) AS n,
   (SELECT t2.amount FROM transactions t2 WHERE lower(t2.description) = lower(t.description) AND t2.type = t.type ORDER BY t2.date DESC, t2.id DESC LIMIT 1),
   MAX(date)
 FROM transactions t
-WHERE date >= ? AND type != 'adjust' AND description != ''
+WHERE ledger_id = ? AND date >= ? AND type != 'adjust' AND description != ''
 GROUP BY lower(description), type, category_id, account_id, to_account_id
 ORDER BY n DESC, MAX(date) DESC
-LIMIT ?`, since, limit)
+LIMIT ?`, LedgerID(ctx), since, limit)
 	if err != nil {
 		return nil, err
 	}

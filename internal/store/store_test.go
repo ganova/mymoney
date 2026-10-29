@@ -1,7 +1,11 @@
 package store
 
 import (
+	"database/sql"
+	"path/filepath"
+
 	"context"
+	"github.com/ganova/mymoney/internal/period"
 	"testing"
 	"time"
 )
@@ -183,5 +187,125 @@ func TestTokens(t *testing.T) {
 	raw, tok, err := s.CreateToken(ctx, "Shortcut")
 	if err != nil || tok.ID == 0 || !s.VerifyToken(ctx, raw) || s.VerifyToken(ctx, raw+"x") {
 		t.Fatalf("token %v %v", tok, err)
+	}
+}
+
+func TestLedgersAreSeparate(t *testing.T) {
+	s := newTestStore(t)
+	pribadi := WithLedger(context.Background(), 1)
+	work := WithLedger(context.Background(), 2)
+
+	pa, _ := s.ListAccounts(pribadi)
+	wa, _ := s.ListAccounts(work)
+	if len(pa) == 0 || len(wa) == 0 {
+		t.Fatalf("tiap buku harus punya akun: %d / %d", len(pa), len(wa))
+	}
+	for _, a := range wa {
+		if a.LedgerID != 2 {
+			t.Fatalf("akun %s bocor ke buku Work", a.Name)
+		}
+	}
+	// akun Pribadi tidak bisa dipakai di buku Work
+	if _, err := s.CreateTransaction(work, Transaction{Type: "expense", Amount: 1000, AccountID: pa[0].ID}); err == nil {
+		t.Fatal("seharusnya menolak akun buku lain")
+	}
+
+	srcs, _ := s.ListIncomeSources(work)
+	if len(srcs) < 2 || srcs[0].Name != "CMW" || srcs[1].Name != "Freelance" {
+		t.Fatalf("sumber pemasukan awal: %+v", srcs)
+	}
+	cats, _ := s.ListCategories(work)
+	var klien int64
+	for _, c := range cats {
+		if c.Name == "Pembayaran Klien" {
+			klien = c.ID
+		}
+		if c.Name == "Makan & Minum" {
+			t.Fatal("kategori Pribadi bocor ke Work")
+		}
+	}
+	fl := srcs[1].ID
+	if _, err := s.CreateTransaction(work, Transaction{Type: "income", Amount: 5_000_000, AccountID: wa[0].ID, CategoryID: &klien, IncomeSourceID: &fl, Description: "Proyek web"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateTransaction(pribadi, Transaction{Type: "income", Amount: 9_000_000, AccountID: pa[0].ID, Description: "Gaji", IncomeSourceID: &srcs[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	p, _ := s.CurrentPeriod(pribadi)
+	dw, err := s.Dashboard(work, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dp, _ := s.Dashboard(pribadi, p)
+	if dw.Income != 5_000_000 || dp.Income != 9_000_000 {
+		t.Fatalf("pemasukan tercampur: work=%d pribadi=%d", dw.Income, dp.Income)
+	}
+	if len(dw.IncomeBySource) != 1 || *dw.IncomeBySource[0].SourceID != fl {
+		t.Fatalf("pemasukan per sumber: %+v", dw.IncomeBySource)
+	}
+	if l, _ := s.ListTransactions(work, TxFilter{}); len(l) != 1 {
+		t.Fatalf("daftar transaksi Work: %d", len(l))
+	}
+
+	// transfer Pribadi → Work tampil di kedua buku
+	to := wa[0].ID
+	if _, err := s.CreateTransaction(pribadi, Transaction{Type: "transfer", Amount: 1_000_000, AccountID: pa[0].ID, ToAccountID: &to}); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := s.ListTransactions(work, TxFilter{}); len(l) != 2 {
+		t.Fatalf("transfer masuk harus tampil di Work: %d", len(l))
+	}
+	// budget terpisah
+	if _, err := s.UpsertBudget(work, Budget{Period: p.Key, CategoryID: klien, Amount: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := s.HasBudget(pribadi, p.Key); ok {
+		t.Fatal("budget Work bocor ke Pribadi")
+	}
+}
+
+func TestMigrateV1Database(t *testing.T) {
+	dir := t.TempDir()
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "mymoney.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		migrations[0],
+		`CREATE TABLE schema_version (version INTEGER NOT NULL)`,
+		`INSERT INTO schema_version VALUES (1)`,
+		`INSERT INTO accounts (name) VALUES ('BCA')`,
+		`INSERT INTO categories (name, kind) VALUES ('Makan', 'expense')`,
+		`INSERT INTO transactions (date, type, amount, account_id, category_id) VALUES ('2026-10-01','expense',25000,1,1)`,
+		`INSERT INTO budgets (period, category_id, amount) VALUES ('2026-10', 1, 500000)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	s, err := Open(dir, loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	pribadi := WithLedger(context.Background(), 1)
+	if l, _ := s.ListTransactions(pribadi, TxFilter{}); len(l) != 1 || l[0].LedgerID != 1 {
+		t.Fatalf("transaksi lama harus masuk buku Pribadi: %+v", l)
+	}
+	if b, _ := s.ListBudgets(pribadi, period.For(s.Today(), 28)); false && len(b) == 0 {
+		t.Fatal()
+	}
+	if ok, _ := s.HasBudget(pribadi, "2026-10"); !ok {
+		t.Fatal("budget lama hilang")
+	}
+	if wa, _ := s.ListAccounts(WithLedger(context.Background(), 2)); len(wa) != 2 {
+		t.Fatalf("akun Work harus tersedia: %d", len(wa))
+	}
+	if c, _ := s.ListCategories(pribadi); len(c) != 1 {
+		t.Fatalf("kategori lama harus tetap di Pribadi: %d", len(c))
 	}
 }

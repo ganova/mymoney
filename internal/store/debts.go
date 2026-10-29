@@ -42,7 +42,7 @@ func scanDebt(sc interface{ Scan(...any) error }) (Debt, error) {
 
 // ListDebts mengembalikan semua utang.
 func (s *Store) ListDebts(ctx context.Context) ([]Debt, error) {
-	rows, err := s.DB.QueryContext(ctx, debtSQL+` ORDER BY d.archived, d.id`)
+	rows, err := s.DB.QueryContext(ctx, debtSQL+` WHERE d.ledger_id = ? ORDER BY d.archived, d.id`, LedgerID(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +86,8 @@ func (s *Store) CreateDebt(ctx context.Context, d Debt) (Debt, error) {
 	if err := d.normalize(); err != nil {
 		return d, err
 	}
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO debts (name, total, monthly, due_day, note, archived) VALUES (?,?,?,?,?,?)`,
-		d.Name, d.Total, d.Monthly, d.DueDay, d.Note, d.Archived)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO debts (name, total, monthly, due_day, note, archived, ledger_id) VALUES (?,?,?,?,?,?,?)`,
+		d.Name, d.Total, d.Monthly, d.DueDay, d.Note, d.Archived, LedgerID(ctx))
 	if err != nil {
 		return d, err
 	}

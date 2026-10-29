@@ -1,19 +1,21 @@
 <script lang="ts">
   import type { Transaction } from '../lib/types';
-  import { acc, cat, debt } from '../lib/state.svelte';
+  import { acc, anyAccount, cat, debt, source } from '../lib/state.svelte';
   import { rp, shortDate } from '../lib/format';
 
   let { tx, onclick, showDate = false }: { tx: Transaction; onclick?: () => void; showDate?: boolean } = $props();
 
   const c = $derived(cat(tx.category_id));
   const a = $derived(acc(tx.account_id));
-  const to = $derived(acc(tx.to_account_id));
+  const to = $derived(anyAccount(tx.to_account_id));
+  const src = $derived(source(tx.income_source_id));
   const d = $derived(debt(tx.debt_id));
   const icon = $derived(tx.type === 'transfer' ? '🔁' : tx.type === 'adjust' ? '⚖️' : (c?.icon ?? (tx.type === 'income' ? '💵' : '🧾')));
   const sub = $derived.by(() => {
     const parts: string[] = [];
     if (tx.type === 'transfer') parts.push(`${a?.name ?? '?'} → ${to?.name ?? '?'}`);
     else {
+      if (src) parts.push(src.name);
       if (c) parts.push(c.name);
       if (a) parts.push(a.name);
     }

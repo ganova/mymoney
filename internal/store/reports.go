@@ -59,8 +59,10 @@ type Dashboard struct {
 	BillsPaid      int64 `json:"bills_paid"`
 
 	ByCategory []CatTotal `json:"by_category"`
-	Daily      []DayTotal `json:"daily"`
-	Budgets    []Budget   `json:"budgets"`
+	// IncomeBySource: pemasukan periode per sumber (CMW, Freelance, ...).
+	IncomeBySource []SourceTotal `json:"income_by_source"`
+	Daily          []DayTotal    `json:"daily"`
+	Budgets        []Budget      `json:"budgets"`
 
 	Accounts      []Account `json:"accounts"`
 	TotalBalance  int64     `json:"total_balance"`
@@ -77,13 +79,13 @@ func (s *Store) totals(ctx context.Context, from, to string) (income, expense in
 	err = s.DB.QueryRowContext(ctx, `SELECT
 		COALESCE(SUM(CASE WHEN type='income' THEN amount END),0),
 		COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0)
-		FROM transactions WHERE date BETWEEN ? AND ?`, from, to).Scan(&income, &expense)
+		FROM transactions WHERE ledger_id = ? AND date BETWEEN ? AND ?`, LedgerID(ctx), from, to).Scan(&income, &expense)
 	return
 }
 
 func (s *Store) byCategory(ctx context.Context, from, to string) ([]CatTotal, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT category_id, type, SUM(amount), COUNT(*) FROM transactions
-		WHERE date BETWEEN ? AND ? AND type IN ('income','expense') GROUP BY category_id, type ORDER BY SUM(amount) DESC`, from, to)
+		WHERE ledger_id = ? AND date BETWEEN ? AND ? AND type IN ('income','expense') GROUP BY category_id, type ORDER BY SUM(amount) DESC`, LedgerID(ctx), from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -101,11 +103,38 @@ func (s *Store) byCategory(ctx context.Context, from, to string) ([]CatTotal, er
 	return out, rows.Err()
 }
 
+// SourceTotal adalah total pemasukan per sumber; SourceID nil = tanpa sumber.
+type SourceTotal struct {
+	SourceID *int64 `json:"source_id"`
+	Total    int64  `json:"total"`
+	Count    int64  `json:"count"`
+}
+
+func (s *Store) incomeBySource(ctx context.Context, from, to string) ([]SourceTotal, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT income_source_id, SUM(amount), COUNT(*) FROM transactions
+		WHERE ledger_id = ? AND type = 'income' AND date BETWEEN ? AND ? GROUP BY income_source_id ORDER BY SUM(amount) DESC`, LedgerID(ctx), from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SourceTotal{}
+	for rows.Next() {
+		var x SourceTotal
+		var id sql.NullInt64
+		if err := rows.Scan(&id, &x.Total, &x.Count); err != nil {
+			return nil, err
+		}
+		x.SourceID = ptr(id)
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) daily(ctx context.Context, p period.Period) ([]DayTotal, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT date,
 		COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0),
 		COALESCE(SUM(CASE WHEN type='income' THEN amount END),0)
-		FROM transactions WHERE date BETWEEN ? AND ? GROUP BY date`, p.StartStr(), p.EndStr())
+		FROM transactions WHERE ledger_id = ? AND date BETWEEN ? AND ? GROUP BY date`, LedgerID(ctx), p.StartStr(), p.EndStr())
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +188,9 @@ func (s *Store) Dashboard(ctx context.Context, p period.Period) (*Dashboard, err
 		return nil, err
 	}
 	if d.ByCategory, err = s.byCategory(ctx, p.StartStr(), p.EndStr()); err != nil {
+		return nil, err
+	}
+	if d.IncomeBySource, err = s.incomeBySource(ctx, p.StartStr(), p.EndStr()); err != nil {
 		return nil, err
 	}
 	if d.Daily, err = s.daily(ctx, p); err != nil {
@@ -317,14 +349,15 @@ func shortDate(s string) string {
 
 // Report adalah laporan lengkap satu periode.
 type Report struct {
-	Period     period.Info  `json:"period"`
-	Income     int64        `json:"income"`
-	Expense    int64        `json:"expense"`
-	ByCategory []CatTotal   `json:"by_category"`
-	Daily      []DayTotal   `json:"daily"`
-	Top        []TopItem    `json:"top"`
-	ByAccount  []AccTotal   `json:"by_account"`
-	History    []PeriodStat `json:"history"`
+	Period         period.Info   `json:"period"`
+	Income         int64         `json:"income"`
+	Expense        int64         `json:"expense"`
+	ByCategory     []CatTotal    `json:"by_category"`
+	IncomeBySource []SourceTotal `json:"income_by_source"`
+	Daily          []DayTotal    `json:"daily"`
+	Top            []TopItem     `json:"top"`
+	ByAccount      []AccTotal    `json:"by_account"`
+	History        []PeriodStat  `json:"history"`
 }
 
 // TopItem adalah deskripsi pengeluaran terbesar.
@@ -360,11 +393,14 @@ func (s *Store) Report(ctx context.Context, p period.Period, historyN int) (*Rep
 	if r.ByCategory, err = s.byCategory(ctx, p.StartStr(), p.EndStr()); err != nil {
 		return nil, err
 	}
+	if r.IncomeBySource, err = s.incomeBySource(ctx, p.StartStr(), p.EndStr()); err != nil {
+		return nil, err
+	}
 	if r.Daily, err = s.daily(ctx, p); err != nil {
 		return nil, err
 	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT description, MAX(category_id), SUM(amount), COUNT(*) FROM transactions
-		WHERE date BETWEEN ? AND ? AND type = 'expense' GROUP BY lower(description) ORDER BY SUM(amount) DESC LIMIT 15`, p.StartStr(), p.EndStr())
+		WHERE ledger_id = ? AND date BETWEEN ? AND ? AND type = 'expense' GROUP BY lower(description) ORDER BY SUM(amount) DESC LIMIT 15`, LedgerID(ctx), p.StartStr(), p.EndStr())
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +418,7 @@ func (s *Store) Report(ctx context.Context, p period.Period, historyN int) (*Rep
 	rows.Close()
 	rows, err = s.DB.QueryContext(ctx, `SELECT account_id,
 		COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0), COALESCE(SUM(CASE WHEN type='income' THEN amount END),0)
-		FROM transactions WHERE date BETWEEN ? AND ? AND type IN ('income','expense') GROUP BY account_id ORDER BY 2 DESC`, p.StartStr(), p.EndStr())
+		FROM transactions WHERE ledger_id = ? AND date BETWEEN ? AND ? AND type IN ('income','expense') GROUP BY account_id ORDER BY 2 DESC`, LedgerID(ctx), p.StartStr(), p.EndStr())
 	if err != nil {
 		return nil, err
 	}

@@ -62,6 +62,13 @@ func (s *Server) routes() {
 	p("DELETE /api/accounts/{id}", s.handleDeleteAccount)
 	p("POST /api/accounts/{id}/reconcile", s.handleReconcile)
 
+	p("GET /api/ledgers", s.handleListLedgers)
+	p("PUT /api/ledgers/{id}", s.handleUpdateLedger)
+	p("GET /api/income-sources", s.handleListSources)
+	p("POST /api/income-sources", s.handleCreateSource)
+	p("PUT /api/income-sources/{id}", s.handleUpdateSource)
+	p("DELETE /api/income-sources/{id}", s.handleDeleteSource)
+
 	p("GET /api/categories", s.handleListCategories)
 	p("POST /api/categories", s.handleCreateCategory)
 	p("PUT /api/categories/{id}", s.handleUpdateCategory)
@@ -122,10 +129,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 	start := time.Now()
 	rw := &statusWriter{ResponseWriter: w, status: 200}
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		r = r.WithContext(s.withLedger(r))
+	}
 	s.mux.ServeHTTP(rw, r)
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rw.status, time.Since(start).Round(time.Millisecond))
 	}
+}
+
+// withLedger memilih buku keuangan aktif dari header X-Ledger atau ?ledger=
+// (default: Pribadi). Buku yang tidak dikenal diabaikan.
+func (s *Server) withLedger(r *http.Request) context.Context {
+	v := r.Header.Get("X-Ledger")
+	if v == "" {
+		v = r.URL.Query().Get("ledger")
+	}
+	if id, err := strconv.ParseInt(v, 10, 64); err == nil && s.store.ValidLedger(r.Context(), id) {
+		return store.WithLedger(r.Context(), id)
+	}
+	return store.WithLedger(r.Context(), store.DefaultLedger)
 }
 
 type statusWriter struct {

@@ -15,6 +15,14 @@ type Settings struct {
 	OwnerName        string `json:"owner_name"`
 }
 
+// defaultAccountKey: akun bawaan disimpan per buku (buku Pribadi memakai kunci lama).
+func defaultAccountKey(ctx context.Context) string {
+	if id := LedgerID(ctx); id != DefaultLedger {
+		return "default_account_id_" + strconv.FormatInt(id, 10)
+	}
+	return "default_account_id"
+}
+
 func (s *Store) rawSettings(ctx context.Context) (map[string]string, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT key, value FROM settings`)
 	if err != nil {
@@ -42,7 +50,12 @@ func (s *Store) GetSettings(ctx context.Context) (Settings, error) {
 	if v, err := strconv.Atoi(m["period_start_day"]); err == nil && v >= 1 && v <= 31 {
 		st.PeriodStartDay = v
 	}
-	st.DefaultAccountID, _ = strconv.ParseInt(m["default_account_id"], 10, 64)
+	st.DefaultAccountID, _ = strconv.ParseInt(m[defaultAccountKey(ctx)], 10, 64)
+	if a, err := s.GetAccount(ctx, st.DefaultAccountID); err != nil || a.LedgerID != LedgerID(ctx) || a.Archived {
+		// akun bawaan harus milik buku aktif; bila tidak, pakai akun pertama buku ini
+		st.DefaultAccountID = 0
+		s.DB.QueryRowContext(ctx, `SELECT id FROM accounts WHERE ledger_id = ? AND archived = 0 ORDER BY sort, id LIMIT 1`, LedgerID(ctx)).Scan(&st.DefaultAccountID)
+	}
 	st.AIAutosave = m["ai_autosave"] == "true"
 	st.OwnerName = m["owner_name"]
 	return st, nil
@@ -54,10 +67,10 @@ func (s *Store) SaveSettings(ctx context.Context, st Settings) error {
 		return invalid("tanggal mulai periode harus 1–31")
 	}
 	vals := map[string]string{
-		"period_start_day":   strconv.Itoa(st.PeriodStartDay),
-		"default_account_id": strconv.FormatInt(st.DefaultAccountID, 10),
-		"ai_autosave":        strconv.FormatBool(st.AIAutosave),
-		"owner_name":         st.OwnerName,
+		"period_start_day":     strconv.Itoa(st.PeriodStartDay),
+		defaultAccountKey(ctx): strconv.FormatInt(st.DefaultAccountID, 10),
+		"ai_autosave":          strconv.FormatBool(st.AIAutosave),
+		"owner_name":           st.OwnerName,
 	}
 	for k, v := range vals {
 		if err := s.SetSetting(ctx, k, v); err != nil {

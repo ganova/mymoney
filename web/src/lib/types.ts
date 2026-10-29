@@ -17,8 +17,31 @@ export interface Account {
   aliases: string;
   archived: boolean;
   sort: number;
+  ledger_id: number;
   balance: number;
   tx_count: number;
+}
+
+export interface Ledger {
+  id: number;
+  name: string;
+  icon: string;
+  sort: number;
+}
+
+export interface IncomeSource {
+  id: number;
+  name: string;
+  icon: string;
+  keywords: string;
+  archived: boolean;
+  sort: number;
+}
+
+export interface SourceTotal {
+  source_id: number | null;
+  total: number;
+  count: number;
 }
 
 export interface Category {
@@ -56,6 +79,7 @@ export interface Transaction {
   to_account_id: number | null;
   category_id: number | null;
   debt_id: number | null;
+  income_source_id?: number | null;
   description: string;
   note: string;
   source: string;
@@ -73,6 +97,7 @@ export interface Draft {
   account_id: number;
   to_account_id: number | null;
   debt_id: number | null;
+  income_source_id?: number | null;
   note: string;
   raw?: string;
   confidence: number;
@@ -147,6 +172,7 @@ export interface Dashboard {
   bills_total: number;
   bills_paid: number;
   by_category: CatTotal[];
+  income_by_source: SourceTotal[];
   daily: DayTotal[];
   budgets: Budget[];
   accounts: Account[];
@@ -163,6 +189,7 @@ export interface Report {
   income: number;
   expense: number;
   by_category: CatTotal[];
+  income_by_source: SourceTotal[];
   daily: DayTotal[];
   top: { description: string; category_id: number | null; total: number; count: number }[];
   by_account: { account_id: number; expense: number; income: number }[];

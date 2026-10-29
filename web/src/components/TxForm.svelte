@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Transaction, Draft } from '../lib/types';
-  import { app, activeAccounts, activeCategories, changed, toast, toastError, haptic } from '../lib/state.svelte';
+  import { app, ledgerName, activeAccounts, activeCategories, changed, toast, toastError, haptic } from '../lib/state.svelte';
   import { api } from '../lib/api';
   import { addDays } from '../lib/format';
   import AmountField from './AmountField.svelte';
@@ -33,6 +33,7 @@
     account_id: initial.account_id || app.settings.default_account_id || activeAccounts()[0]?.id || 0,
     to_account_id: initial.to_account_id ?? null,
     debt_id: initial.debt_id ?? null,
+    income_source_id: initial.income_source_id ?? null,
     date: initial.date || app.today,
     note: initial.note ?? '',
   });
@@ -43,6 +44,8 @@
   const cats = $derived(activeCategories(kind));
   const visibleCats = $derived(showAllCats || cats.length <= 12 ? cats : withSelected(cats.slice(0, 11)));
   const accounts = $derived(activeAccounts());
+  const sources = $derived(app.incomeSources.filter((s) => !s.archived));
+  const otherAccounts = $derived(app.otherAccounts.filter((a) => !a.archived));
   const debts = $derived(app.debts.filter((d) => !d.archived));
   const quick = [10000, 20000, 50000, 100000];
 
@@ -60,6 +63,7 @@
     const c = activeCategories(t === 'income' ? 'income' : 'expense');
     if (!c.some((x) => x.id === f.category_id)) f.category_id = null;
     if (t !== 'expense') f.debt_id = null;
+    if (t !== 'income') f.income_source_id = null;
     if (t === 'transfer' && !f.to_account_id) {
       f.to_account_id = accounts.find((a) => a.id !== f.account_id && a.type === 'cash')?.id ?? accounts.find((a) => a.id !== f.account_id)?.id ?? null;
     }
@@ -88,6 +92,7 @@
       account_id: f.account_id,
       to_account_id: f.type === 'transfer' ? f.to_account_id : null,
       debt_id: f.type === 'expense' ? f.debt_id : null,
+      income_source_id: f.type === 'income' ? f.income_source_id : null,
       date: f.date,
       note: f.note.trim(),
       source: initial.source,
@@ -184,12 +189,27 @@
     </div>
   </div>
 
+  {#if f.type === 'income' && sources.length > 0}
+    <div class="field">
+      <span>Sumber pemasukan</span>
+      <div class="chips">
+        <button type="button" class="chip" class:on={!f.income_source_id} onclick={() => (f.income_source_id = null)}>Lainnya</button>
+        {#each sources as s (s.id)}
+          <button type="button" class="chip" class:on={f.income_source_id === s.id} onclick={() => (f.income_source_id = s.id)}>{s.icon} {s.name}</button>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   {#if f.type === 'transfer'}
     <div class="field">
       <span>Ke akun</span>
       <div class="chips">
         {#each accounts.filter((a) => a.id !== f.account_id) as a (a.id)}
           <button type="button" class="chip" class:on={f.to_account_id === a.id} onclick={() => (f.to_account_id = a.id)}>{a.icon} {a.name}</button>
+        {/each}
+        {#each otherAccounts as a (a.id)}
+          <button type="button" class="chip" class:on={f.to_account_id === a.id} onclick={() => (f.to_account_id = a.id)}>{a.icon} {a.name} · {ledgerName(a.ledger_id)}</button>
         {/each}
       </div>
     </div>

@@ -22,6 +22,7 @@ Cara membaca:
 - Uang masuk → type "income", KECUALI dari akun milik pengguna sendiri → transfer (akun asal ke akun ini).
 - Abaikan baris yang bukan transaksi: saldo awal/akhir, total, header, iklan, tombol, transaksi gagal/dibatalkan, dan baris "pending" yang jelas belum terjadi (tulis di notes).
 - Jangan menggandakan transaksi bila satu transaksi tampil di beberapa baris teks. Bila beberapa gambar saling tumpang tindih, transaksi yang sama cukup ditulis sekali.
+- Untuk uang masuk (income), isi income_source_id sesuai daftar sumber pemasukan (mis. CMW atau Freelance) bila bisa ditebak dari keterangan; selain itu null.
 - amount selalu positif (bilangan bulat rupiah, tanpa sen). "189000.00" = 189000.
 - date: format YYYY-MM-DD. Bila tahun tidak tertulis, pilih tahun yang membuat tanggal tidak berada di masa depan relatif terhadap hari ini. Pada mutasi BCA, "0505" di keterangan biasanya DDMM. Bila sumber hanya memuat angka hari (mis. 28, 29, 1, 2), tafsirkan di dalam periode yang disebutkan di bawah.
 - raw: salin teks asli baris transaksi (satukan menjadi satu baris).
