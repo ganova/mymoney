@@ -64,6 +64,9 @@ type Config struct {
 	AIEffort         string
 	AIVisionEffort   string
 	AIFallbacks      bool
+	AIProvider       string // auto | api | codex | offline
+	CodexPath        string
+	CodexModel       string
 }
 
 func env(key, def string) string {
@@ -94,5 +97,8 @@ func Load() Config {
 		AIEffort:         env("AI_EFFORT", "low"),
 		AIVisionEffort:   env("AI_VISION_EFFORT", "medium"),
 		AIFallbacks:      env("AI_FALLBACKS", "true") != "false",
+		AIProvider:       strings.ToLower(env("AI_PROVIDER", "auto")),
+		CodexPath:        os.Getenv("CODEX_PATH"),
+		CodexModel:       os.Getenv("CODEX_MODEL"),
 	}
 }

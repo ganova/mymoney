@@ -43,8 +43,26 @@ func main() {
 	}
 	defer st.Close()
 
+	apiKey, codexPath := cfg.AnthropicKey, ""
+	switch cfg.AIProvider {
+	case "offline":
+		apiKey = ""
+	case "codex":
+		apiKey, codexPath = "", ai.FindCodex(cfg.CodexPath)
+		if codexPath == "" {
+			log.Printf("AI_PROVIDER=codex tetapi Codex CLI tidak ditemukan (npm i -g @openai/codex); memakai mode offline")
+		}
+	case "auto":
+		if apiKey == "" {
+			codexPath = ai.FindCodex(cfg.CodexPath)
+		}
+	}
+	if codexPath != "" {
+		log.Printf("AI memakai Codex CLI: %s", codexPath)
+	}
 	aiSvc := ai.New(ai.Config{
-		APIKey: cfg.AnthropicKey, BaseURL: cfg.AnthropicBaseURL, Model: cfg.AIModel,
+		CodexPath: codexPath, CodexModel: cfg.CodexModel,
+		APIKey: apiKey, BaseURL: cfg.AnthropicBaseURL, Model: cfg.AIModel,
 		Effort: cfg.AIEffort, VisionEffort: cfg.AIVisionEffort, Fallbacks: cfg.AIFallbacks,
 	}, st)
 

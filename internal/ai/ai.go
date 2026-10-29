@@ -27,6 +27,8 @@ type Config struct {
 	Effort       string // effort untuk asisten/catat cepat (default low)
 	VisionEffort string // effort untuk screenshot/impor (default medium)
 	Fallbacks    bool   // aktifkan server-side fallback saat ditolak classifier
+	CodexPath    string // lokasi Codex CLI; dipakai bila APIKey kosong
+	CodexModel   string // model Codex (kosong = bawaan Codex)
 }
 
 // Service adalah gerbang ke Claude API.
@@ -63,10 +65,20 @@ func New(cfg Config, st *store.Store) *Service {
 }
 
 // Enabled melaporkan apakah API key tersedia.
-func (s *Service) Enabled() bool { return s != nil && s.cfg.APIKey != "" }
+func (s *Service) Enabled() bool { return s.apiReady() || s.codexReady() }
+
+func (s *Service) apiReady() bool { return s != nil && s.cfg.APIKey != "" }
 
 // Model mengembalikan nama model yang dipakai.
-func (s *Service) Model() string { return s.cfg.Model }
+func (s *Service) Model() string {
+	if !s.apiReady() && s.codexReady() {
+		if s.cfg.CodexModel != "" {
+			return "Codex CLI · " + s.cfg.CodexModel
+		}
+		return "Codex CLI"
+	}
+	return s.cfg.Model
+}
 
 // supportsFallback: server-side fallback tersedia untuk keluarga Opus 5.x,
 // Sonnet 5.5, dan Fable; tidak untuk Haiku.
@@ -181,3 +193,6 @@ func jsonFormat(schema map[string]any) anthropic.BetaJSONOutputFormatParam {
 func userText(text string) anthropic.BetaMessageParam {
 	return anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(text))
 }
+
+// ErrNeedAPI: fitur yang butuh API key Claude (tidak tersedia lewat Codex CLI).
+var ErrNeedAPI = fmt.Errorf("%w (Codex CLI hanya untuk catat via kalimat, screenshot, dan tanya-jawab)", ErrDisabled)

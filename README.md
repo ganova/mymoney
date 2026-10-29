@@ -183,3 +183,6 @@ make check  # go vet + svelte-check
 ```
 
 Struktur: `cmd/mymoney` (main), `internal/*` (backend), `web/src` (frontend: `pages/`, `components/`, `lib/`).
+
+## AI lewat Codex CLI (tanpa API key)
+Pasang Codex CLI di PC (`npm i -g @openai/codex`, lalu `codex login`). Bila `ANTHROPIC_API_KEY` kosong, MyMoney otomatis memakai `codex exec` untuk membaca kalimat, screenshot, dan tanya-jawab (memakai kuota langganan ChatGPT). Atur dengan `AI_PROVIDER` (`auto`/`codex`/`offline`), `CODEX_PATH`, `CODEX_MODEL`. PDF tetap dibaca offline; saran budget & analisis butuh API key. Bila Codex gagal, aplikasi kembali ke parser offline.

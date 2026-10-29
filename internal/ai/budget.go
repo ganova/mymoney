@@ -85,6 +85,9 @@ type BudgetSuggestion struct {
 
 // SuggestBudget mengubah daftar/kalimat bebas menjadi baris budget.
 func (s *Service) SuggestBudget(ctx context.Context, text string) (*BudgetSuggestion, error) {
+	if !s.apiReady() {
+		return nil, ErrNeedAPI
+	}
 	c, err := LoadContext(ctx, s.store)
 	if err != nil {
 		return nil, err
@@ -136,6 +139,9 @@ Jangan mengarang data yang tidak ada. Maksimal ±200 kata.`
 
 // Insight menulis analisis AI untuk satu periode.
 func (s *Service) Insight(ctx context.Context, key string) (string, error) {
+	if !s.apiReady() {
+		return "", ErrNeedAPI
+	}
 	c, err := LoadContext(ctx, s.store)
 	if err != nil {
 		return "", err

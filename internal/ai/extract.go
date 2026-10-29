@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -69,6 +70,21 @@ type ExtractResult struct {
 	Drafts    []Draft `json:"drafts"`
 }
 
+// extractInstr menyusun instruksi akun sumber dan periode acuan.
+func (s *Service) extractInstr(c *Context, in ExtractInput, p period.Period) string {
+	var instr strings.Builder
+	if in.AccountID != 0 {
+		fmt.Fprintf(&instr, "Akun sumber mutasi: id=%d (%s). Gunakan sebagai account_id untuk semua transaksi (kecuali transfer masuk dari akun lain).\n", in.AccountID, c.accName(in.AccountID))
+	} else {
+		instr.WriteString("Akun sumber mutasi: deteksi otomatis dari tampilan/isi (mis. logo/nama aplikasi myBCA → akun BCA). Bila tidak jelas, gunakan akun default.\n")
+	}
+	fmt.Fprintf(&instr, "Periode acuan: %s (%s s/d %s). Angka hari ≥ %d berada di bulan %s %d; angka hari lainnya di bulan %s %d.\n",
+		p.Label, p.StartStr(), p.EndStr(), p.Start.Day(),
+		period.MonthName(p.Start.Month()), p.Start.Year(), period.MonthName(p.End.Month()), p.End.Year())
+
+	return instr.String()
+}
+
 // Extract membaca transaksi dari screenshot atau teks, lalu menandai
 // kemungkinan duplikat dengan transaksi yang sudah tersimpan.
 func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult, error) {
@@ -82,15 +98,10 @@ func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult,
 			p = q
 		}
 	}
-	var instr strings.Builder
-	if in.AccountID != 0 {
-		fmt.Fprintf(&instr, "Akun sumber mutasi: id=%d (%s). Gunakan sebagai account_id untuk semua transaksi (kecuali transfer masuk dari akun lain).\n", in.AccountID, c.accName(in.AccountID))
-	} else {
-		instr.WriteString("Akun sumber mutasi: deteksi otomatis dari tampilan/isi (mis. logo/nama aplikasi myBCA → akun BCA). Bila tidak jelas, gunakan akun default.\n")
+	if !s.apiReady() {
+		return s.codexExtract(ctx, c, in, p)
 	}
-	fmt.Fprintf(&instr, "Periode acuan: %s (%s s/d %s). Angka hari ≥ %d berada di bulan %s %d; angka hari lainnya di bulan %s %d.\n",
-		p.Label, p.StartStr(), p.EndStr(), p.Start.Day(),
-		period.MonthName(p.Start.Month()), p.Start.Year(), period.MonthName(p.End.Month()), p.End.Year())
+	instr := s.extractInstr(c, in, p)
 
 	var content []anthropic.BetaContentBlockParamUnion
 	for i, img := range in.Images {
@@ -112,7 +123,7 @@ func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult,
 	if len(content) == 0 {
 		return nil, fmt.Errorf("tidak ada gambar, PDF, atau teks untuk dibaca")
 	}
-	content = append(content, anthropic.NewBetaTextBlock(instr.String()+"\nEkstrak semua transaksinya sekarang."))
+	content = append(content, anthropic.NewBetaTextBlock(instr+"\nEkstrak semua transaksinya sekarang."))
 
 	params := s.baseParams(s.cfg.VisionEffort, 64000)
 	params.System = s.systemBlocks(c, extractPrompt)
@@ -127,14 +138,43 @@ func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult,
 	if err != nil {
 		return nil, err
 	}
+	return s.finishExtract(ctx, c, in, []byte(textOf(msg)))
+}
+
+// MarkDuplicates menandai draf yang kemungkinan sudah tercatat.
+func MarkDuplicates(ctx context.Context, st *store.Store, drafts []Draft) {
+	for i := range drafts {
+		drafts[i].DuplicateOf = st.FindDuplicate(ctx, drafts[i].Transaction())
+	}
+}
+
+func (s *Service) codexExtract(ctx context.Context, c *Context, in ExtractInput, p period.Period) (*ExtractResult, error) {
+	if len(in.PDFs) > 0 {
+		return nil, fmt.Errorf("Codex CLI belum membaca PDF langsung; pakai pembaca PDF offline")
+	}
+	if len(in.Images) == 0 && strings.TrimSpace(in.Text) == "" {
+		return nil, fmt.Errorf("tidak ada gambar, PDF, atau teks untuk dibaca")
+	}
+	raw, err := s.runCodex(ctx, s.codexExtractPrompt(c, in, p), extractSchema(), in.Images)
+	if err != nil {
+		return nil, err
+	}
+	return s.finishExtract(ctx, c, in, raw)
+}
+
+func (s *Service) finishExtract(ctx context.Context, c *Context, in ExtractInput, raw []byte) (*ExtractResult, error) {
+	kind := in.Kind
+	if kind == "" {
+		kind = "ai_image"
+	}
 	var out struct {
 		Source       string  `json:"source"`
 		AccountID    *int64  `json:"account_id"`
 		Transactions []Draft `json:"transactions"`
 		Notes        string  `json:"notes"`
 	}
-	if err := decodeJSON(msg, &out); err != nil {
-		return nil, err
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("jawaban AI tidak valid: %w", err)
 	}
 	res := &ExtractResult{Source: out.Source, Notes: out.Notes, Drafts: []Draft{}}
 	if in.AccountID != 0 {
@@ -157,11 +197,4 @@ func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult,
 		res.Drafts = append(res.Drafts, d)
 	}
 	return res, nil
-}
-
-// MarkDuplicates menandai draf yang kemungkinan sudah tercatat.
-func MarkDuplicates(ctx context.Context, st *store.Store, drafts []Draft) {
-	for i := range drafts {
-		drafts[i].DuplicateOf = st.FindDuplicate(ctx, drafts[i].Transaction())
-	}
 }
