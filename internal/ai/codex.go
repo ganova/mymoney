@@ -23,9 +23,8 @@ func FindCodex(explicit string) string {
 		}
 		return ""
 	}
-	if p, err := exec.LookPath("codex"); err == nil {
-		return p
-	}
+	// Di Windows, codex dari npm (-g) lebih mudah diperbarui daripada codex.exe
+	// bawaan aplikasi desktop yang bisa tertinggal versinya, jadi dicek lebih dulu.
 	if runtime.GOOS == "windows" {
 		for _, base := range []string{os.Getenv("APPDATA"), filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")} {
 			if base == "" {
@@ -38,6 +37,9 @@ func FindCodex(explicit string) string {
 				}
 			}
 		}
+	}
+	if p, err := exec.LookPath("codex"); err == nil {
+		return p
 	}
 	return ""
 }
