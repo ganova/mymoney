@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 	_ "time/tzdata" // zona waktu tetap tersedia di image minimal
@@ -28,6 +30,13 @@ func main() {
 		return
 	}
 
+	if runtime.GOOS == "windows" {
+		// versi Windows berjalan tanpa jendela: tulis log ke file
+		os.MkdirAll(cfg.DataDir, 0o755)
+		if f, err := os.OpenFile(filepath.Join(cfg.DataDir, "mymoney.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+			log.SetOutput(f)
+		}
+	}
 	st, err := store.Open(cfg.DataDir, cfg.Location)
 	if err != nil {
 		log.Fatalf("membuka database: %v", err)

@@ -17,11 +17,12 @@ import (
 var ErrPDFPassword = errors.New("PDF terkunci kata sandi. Isi kata sandi PDF (mis. tanggal lahir untuk e-Statement BCA) lalu coba lagi")
 
 // PDFAvailable melaporkan apakah poppler-utils terpasang.
-func PDFAvailable() bool {
-	_, err1 := exec.LookPath("pdftotext")
-	_, err2 := exec.LookPath("pdftoppm")
-	return err1 == nil && err2 == nil
-}
+var popplerDirs = []string{`C:\Program Files\poppler*\Library\bin`, `C:\Program Files\poppler*\bin`, `C:\poppler*\Library\bin`, `C:\poppler*\bin`}
+
+func pdftotext() string { return find("pdftotext", "PDFTOTEXT_PATH", popplerDirs...) }
+func pdftoppm() string  { return find("pdftoppm", "PDFTOPPM_PATH", popplerDirs...) }
+
+func PDFAvailable() bool { return pdftotext() != "" && pdftoppm() != "" }
 
 // ReadPDF mengambil teks dari PDF. PDF berisi teks (e-Statement) dibaca
 // langsung; PDF hasil scan diubah menjadi gambar lalu dibaca dengan OCR.
@@ -46,7 +47,7 @@ func ReadPDF(ctx context.Context, data []byte, password string) (string, error) 
 	}
 
 	args := append(append([]string{"-layout"}, pw...), in, "-")
-	text, err := run(ctx, "pdftotext", args...)
+	text, err := run(ctx, pdftotext(), args...)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +60,7 @@ func ReadPDF(ctx context.Context, data []byte, password string) (string, error) 
 		return "", ErrUnavailable
 	}
 	args = append(append([]string{"-r", "200", "-png", "-l", "10"}, pw...), in, filepath.Join(dir, "p"))
-	if _, err := run(ctx, "pdftoppm", args...); err != nil {
+	if _, err := run(ctx, pdftoppm(), args...); err != nil {
 		return "", err
 	}
 	pages, _ := filepath.Glob(filepath.Join(dir, "p*.png"))
@@ -82,6 +83,7 @@ func ReadPDF(ctx context.Context, data []byte, password string) (string, error) 
 
 func run(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	hideWindow(cmd)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
