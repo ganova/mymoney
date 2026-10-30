@@ -1,15 +1,24 @@
 <script lang="ts">
-  import type { Debt } from '../lib/types';
+  import type { Debt, Outlook } from '../lib/types';
   import { app, activeCategories, changed, openTx, toast, toastError } from '../lib/state.svelte';
   import { api } from '../lib/api';
   import { back, go } from '../lib/router.svelte';
-  import { rp, pct, shortDate } from '../lib/format';
+  import { rp, rpc, pct, shortDate } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import Sheet from '../components/Sheet.svelte';
   import AmountField from '../components/AmountField.svelte';
 
   let edit = $state<Partial<Debt> | null>(null);
   let busy = $state(false);
+  let outlook = $state<Outlook | null>(null);
+
+  $effect(() => {
+    app.dataVersion;
+    app.debts;
+    api.get<Outlook>('/outlook?months=24').then((o) => (outlook = o)).catch(() => {});
+  });
+  const dueMonths = $derived((outlook?.months ?? []).filter((m) => m.debt_due > 0 || m.debt_paid > 0));
+  const dueTotal = $derived(dueMonths.reduce((s, m) => s + m.debt_due, 0));
 
   const active = $derived(app.debts.filter((d) => !d.archived));
   const done = $derived(app.debts.filter((d) => d.archived));
@@ -64,6 +73,31 @@
     <div class="grow"><div class="tiny muted">Total sisa</div><div class="big num">{rp(totalRemaining)}</div></div>
     <div class="grow"><div class="tiny muted">Cicilan / bulan</div><div class="big num">{rp(totalMonthly)}</div></div>
   </div>
+
+  {#if outlook && active.length > 0}
+    <section class="card">
+      <div class="card-title">Proyeksi cicilan per periode</div>
+      <div class="stack fc">
+        {#each dueMonths as m (m.key)}
+          <div class="row between">
+            <span>{m.label}</span>
+            <span class="num bold">{m.debt_due ? rpc(m.debt_due) : '✓ lunas periode ini'}{m.debt_paid && m.debt_due ? ` (+${rpc(m.debt_paid)} dibayar)` : ''}</span>
+          </div>
+        {/each}
+        {#if dueMonths.length === 0}<div class="small muted">Tidak ada cicilan bulanan terjadwal.</div>{/if}
+      </div>
+      <div class="tiny muted fc-note">
+        Total cicilan terjadwal {rp(dueTotal)}{outlook.debt_free_label ? ` · lunas ${outlook.debt_free_label}` : ''}{outlook.debt_unscheduled ? ` · ${rp(outlook.debt_unscheduled)} tanpa cicilan bulanan (isi "cicilan per bulan" agar masuk jadwal)` : ''}
+      </div>
+      {#if outlook.debts.some((d) => d.months_left > 0)}
+        <div class="stack fc-debts">
+          {#each outlook.debts.filter((d) => d.months_left > 0) as d (d.id)}
+            <div class="row between tiny"><span>{d.name}</span><span class="muted">{d.months_left} periode lagi · lunas {d.last_label}</span></div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   {#if active.length === 0}
     <div class="card empty">
@@ -141,4 +175,7 @@
   .left { text-align: left; }
   .right { text-align: right; }
   .tight { padding: 12px 14px; }
+  .fc { gap: 8px; font-size: 14px; }
+  .fc-note { margin-top: 10px; }
+  .fc-debts { gap: 4px; margin-top: 8px; }
 </style>

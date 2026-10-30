@@ -238,3 +238,34 @@ func TestLedgerHeader(t *testing.T) {
 		t.Fatalf("akun lintas buku harus ditolak: %d", code)
 	}
 }
+
+func TestReceivablesAPI(t *testing.T) {
+	c, _ := newTestServer(t, "")
+	h := []string{"X-Ledger", "2"}
+	code, out := c.do("POST", "/api/receivables", map[string]any{"name": "Web toko", "client": "Fastwork", "amount": 2000000}, h...)
+	if code != 201 {
+		t.Fatalf("create: %d %s", code, out)
+	}
+	var rec struct {
+		ID int64 `json:"id"`
+	}
+	json.Unmarshal(out, &rec)
+	var boot struct {
+		Accounts []store.Account `json:"accounts"`
+	}
+	_, b := c.do("GET", "/api/bootstrap", nil, h...)
+	json.Unmarshal(b, &boot)
+	code, out = c.do("GET", "/api/outlook?months=3", nil, h...)
+	if code != 200 || !strings.Contains(string(out), `"pending_total":2000000`) {
+		t.Fatalf("outlook: %d %s", code, out)
+	}
+	code, out = c.do("POST", "/api/receivables/"+strconv.FormatInt(rec.ID, 10)+"/receive", map[string]any{"account_id": boot.Accounts[0].ID, "amount": 1800000}, h...)
+	if code != 200 || !strings.Contains(string(out), `"status":"received"`) {
+		t.Fatalf("receive: %d %s", code, out)
+	}
+	// buku Pribadi tidak bisa menyentuh data Work
+	code, _ = c.do("PUT", "/api/receivables/"+strconv.FormatInt(rec.ID, 10), map[string]any{"name": "x", "amount": 1}, "X-Ledger", "1")
+	if code != 404 {
+		t.Fatalf("lintas buku: %d", code)
+	}
+}

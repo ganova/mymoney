@@ -69,6 +69,13 @@ func (s *Server) routes() {
 	p("PUT /api/income-sources/{id}", s.handleUpdateSource)
 	p("DELETE /api/income-sources/{id}", s.handleDeleteSource)
 
+	p("GET /api/receivables", s.handleListReceivables)
+	p("POST /api/receivables", s.handleCreateReceivable)
+	p("PUT /api/receivables/{id}", s.handleUpdateReceivable)
+	p("DELETE /api/receivables/{id}", s.handleDeleteReceivable)
+	p("POST /api/receivables/{id}/receive", s.handleReceiveReceivable)
+	p("GET /api/outlook", s.handleOutlook)
+
 	p("GET /api/categories", s.handleListCategories)
 	p("POST /api/categories", s.handleCreateCategory)
 	p("PUT /api/categories/{id}", s.handleUpdateCategory)

@@ -18,6 +18,7 @@
   import ImportPage from './pages/Import.svelte';
   import SettingsPage from './pages/Settings.svelte';
   import SourcesPage from './pages/Sources.svelte';
+  import PendingPage from './pages/Pending.svelte';
 
   onMount(bootstrap);
 
@@ -34,6 +35,7 @@
     '/import': ImportPage,
     '/settings': SettingsPage,
     '/sources': SourcesPage,
+    '/pending': PendingPage,
   };
   const Page = $derived(pages[route.path] ?? Home);
 </script>

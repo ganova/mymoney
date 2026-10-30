@@ -18,6 +18,7 @@ Aplikasi keuangan pribadi (bahasa Indonesia) untuk satu pengguna, dipakai dari S
 - Periode keuangan (`internal/period`): mulai `period_start_day` (default 28); label = bulan akhir periode. Periode "2026-10" = 28 Sep – 27 Okt.
 - Jenis transaksi: `expense`, `income`, `transfer` (antar akun sendiri, tidak masuk laporan), `adjust` (penyesuaian saldo, nominal bertanda).
 - Dua buku (`ledgers`: Pribadi=1, Work=2) dipilih per permintaan lewat header `X-Ledger` → `store.WithLedger(ctx)`; akun, kategori, utang, budget, transaksi dan laporan tersaring per buku. Pemasukan punya `income_source_id` (CMW/Freelance).
+- `receivables` = pendapatan tertunda per buku (status pending/received/cancelled); `Store.Outlook` memproyeksikan pendapatan tertunda dan jadwal cicilan utang per periode.
 - Budget per (periode, kategori); `due_day > 0` = tagihan. `EnsureBudget` menyalin budget terakhir ke periode berjalan bila kosong.
 - Aturan (`rules`) dipelajari otomatis saat transaksi disimpan/dikoreksi dan dimasukkan ke prompt AI serta parser offline.
 - Draf AI (`ai.Draft`) selalu melewati `Context.Sanitize` agar ID akun/kategori valid; pengguna mengonfirmasi sebelum disimpan (kecuali Shortcut/autosave).

@@ -8,6 +8,7 @@
     { path: '/accounts', icon: '🏦', title: 'Akun & Saldo', sub: 'Rekening, tunai, e-wallet, sesuaikan saldo' },
     { path: '/sources', icon: '💼', title: 'Sumber Pemasukan & Buku', sub: 'CMW, Freelance, nama buku Pribadi/Work' },
     { path: '/categories', icon: '🏷️', title: 'Kategori', sub: 'Kelola kategori & kata kunci' },
+    { path: '/pending', icon: '⏳', title: 'Pendapatan Tertunda', sub: 'Dana ditahan Fastwork/klien, proyeksi ke depan' },
     { path: '/debts', icon: '💳', title: 'Utang & Cicilan', sub: 'Paylater, pinjaman, sisa tagihan' },
     { path: '/reports', icon: '📊', title: 'Laporan', sub: 'Grafik, tren, pengeluaran terbesar' },
     { path: '/import', icon: '📥', title: 'Impor Mutasi', sub: 'Screenshot, teks, Excel, PDF e-statement' },

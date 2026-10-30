@@ -229,3 +229,39 @@ export interface BudgetLine {
   due_day: number;
   note: string;
 }
+
+export interface Receivable {
+  id: number;
+  name: string;
+  client: string;
+  amount: number;
+  expected_date: string;
+  income_source_id: number | null;
+  status: 'pending' | 'received' | 'cancelled';
+  note: string;
+  tx_id: number | null;
+  received_at: string;
+  created_at: string;
+}
+
+export interface OutlookMonth {
+  key: string;
+  label: string;
+  range: string;
+  incoming: number;
+  debt_due: number;
+  debt_paid: number;
+  net: number;
+}
+
+export interface Outlook {
+  months: OutlookMonth[];
+  pending_total: number;
+  pending_count: number;
+  pending_unscheduled: number;
+  debt_remaining: number;
+  debt_monthly: number;
+  debt_unscheduled: number;
+  debt_free_label: string;
+  debts: { id: number; name: string; remaining: number; monthly: number; months_left: number; last_label: string }[];
+}

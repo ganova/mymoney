@@ -197,3 +197,7 @@ Sekali: `winget install Git.Git GoLang.Go OpenJS.NodeJS.LTS`, buka PowerShell ba
 `git clone -b claude/bold-turing-wo2evh https://github.com/ganova/mymoney.git` dan `cd mymoney`.
 Setiap kali ingin memasang/memperbarui: `powershell -ExecutionPolicy Bypass -File update-windows.ps1`
 (menarik kode terbaru, membangun exe di PC sendiri, menghentikan versi lama, memasang, dan menjalankan). Data di `%LOCALAPPDATA%\MyMoney\data` tidak disentuh.
+
+## Pendapatan tertunda & proyeksi utang
+- **Lainnya → Pendapatan Tertunda**: catat proyek yang sudah dibayar klien tetapi dananya ditahan (mis. Fastwork) beserta nominal bersih, estimasi tanggal cair, dan sumbernya. Tombol *Sudah cair* membuat transaksi pemasukan di akun yang dipilih (nominal boleh berbeda, mis. dipotong biaya platform).
+- Halaman itu menampilkan total yang akan cair dan proyeksi per periode (pendapatan tertunda vs cicilan utang). **Utang & Cicilan** menampilkan jadwal cicilan per periode, total, dan perkiraan lunas. Beranda punya kartu "Ke depan". Data per buku (Pribadi/Work). API: `/api/receivables`, `/api/outlook`.

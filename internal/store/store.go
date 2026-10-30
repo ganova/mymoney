@@ -236,6 +236,24 @@ INSERT INTO budgets_new (id, ledger_id, period, category_id, amount, due_day, ac
 DROP TABLE budgets;
 ALTER TABLE budgets_new RENAME TO budgets;
 `,
+	// v3: pendapatan tertunda (mis. dana proyek ditahan Fastwork)
+	`
+CREATE TABLE receivables (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id        INTEGER NOT NULL DEFAULT 1,
+  name             TEXT NOT NULL,
+  client           TEXT NOT NULL DEFAULT '',
+  amount           INTEGER NOT NULL,
+  expected_date    TEXT NOT NULL DEFAULT '',
+  income_source_id INTEGER REFERENCES income_sources(id) ON DELETE SET NULL,
+  status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  note             TEXT NOT NULL DEFAULT '',
+  tx_id            INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+  received_at      TEXT NOT NULL DEFAULT '',
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_recv_ledger ON receivables(ledger_id, status);
+`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

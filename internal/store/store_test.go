@@ -309,3 +309,78 @@ func TestMigrateV1Database(t *testing.T) {
 		t.Fatalf("kategori lama harus tetap di Pribadi: %d", len(c))
 	}
 }
+
+func TestReceivablesAndOutlook(t *testing.T) {
+	s := newTestStore(t)
+	work := WithLedger(context.Background(), 2)
+	wa, _ := s.ListAccounts(work)
+	cur, _ := s.CurrentPeriod(work)
+	next := cur.Next()
+	d := func(p time.Time) string { return p.Format("2006-01-02") }
+	srcs, _ := s.ListIncomeSources(work)
+
+	a, err := s.CreateReceivable(work, Receivable{Name: "Website toko", Client: "Fastwork", Amount: 3_000_000, ExpectedDate: d(next.Start), IncomeSourceID: &srcs[1].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateReceivable(work, Receivable{Name: "Logo", Client: "Fastwork", Amount: 500_000}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateReceivable(work, Receivable{Name: "Telat", Amount: 700_000, ExpectedDate: "2020-01-01"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateReceivable(work, Receivable{Name: "x", Amount: 0}); err == nil {
+		t.Fatal("nominal 0 harus ditolak")
+	}
+	// utang: sisa 1jt, cicilan 400rb/bulan → 3 periode (400+400+200)
+	if _, err := s.CreateDebt(work, Debt{Name: "Paylater", Total: 1_000_000, Monthly: 400_000}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateDebt(work, Debt{Name: "Pinjam teman", Total: 250_000}); err != nil {
+		t.Fatal(err)
+	}
+
+	o, err := s.Outlook(work, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.PendingTotal != 4_200_000 || o.PendingUnscheduled != 500_000 || o.PendingCount != 3 {
+		t.Fatalf("pending: %+v", o)
+	}
+	if o.Months[0].Incoming != 700_000 || o.Months[1].Incoming != 3_000_000 {
+		t.Fatalf("pendapatan per bulan: %+v", o.Months[:2])
+	}
+	if o.Months[0].DebtDue != 400_000 || o.Months[1].DebtDue != 400_000 || o.Months[2].DebtDue != 200_000 || o.Months[3].DebtDue != 0 {
+		t.Fatalf("cicilan per bulan: %+v", o.Months)
+	}
+	if o.DebtRemaining != 1_250_000 || o.DebtUnscheduled != 250_000 || o.DebtMonthly != 400_000 || o.DebtFreeLabel != o.Months[2].Label {
+		t.Fatalf("utang: %+v", o)
+	}
+
+	// cairkan dengan nominal lebih kecil (potongan biaya platform)
+	r, tx, err := s.ReceiveReceivable(work, a.ID, wa[0].ID, 2_700_000, d(s.Today()))
+	if err != nil || r.Status != "received" || tx.Amount != 2_700_000 || tx.IncomeSourceID == nil {
+		t.Fatalf("receive: %+v %+v %v", r, tx, err)
+	}
+	if _, _, err := s.ReceiveReceivable(work, a.ID, wa[0].ID, 0, ""); err == nil {
+		t.Fatal("tidak boleh dicairkan dua kali")
+	}
+	o, _ = s.Outlook(work, 6)
+	if o.PendingTotal != 1_200_000 {
+		t.Fatalf("pending setelah cair: %d", o.PendingTotal)
+	}
+
+	// bayar cicilan periode ini → jadwal bergeser
+	debts, _ := s.ListDebts(work)
+	if _, err := s.CreateTransaction(work, Transaction{Type: "expense", Amount: 400_000, AccountID: wa[0].ID, DebtID: &debts[0].ID, Date: d(s.Today())}); err != nil {
+		t.Fatal(err)
+	}
+	o, _ = s.Outlook(work, 6)
+	if o.Months[0].DebtDue != 0 || o.Months[0].DebtPaid != 400_000 || o.Months[1].DebtDue != 400_000 || o.Months[2].DebtDue != 200_000 {
+		t.Fatalf("setelah bayar: %+v", o.Months[:3])
+	}
+	// buku Pribadi tidak melihat data Work
+	if l, _ := s.ListReceivables(WithLedger(context.Background(), 1)); len(l) != 0 {
+		t.Fatal("receivable bocor ke Pribadi")
+	}
+}

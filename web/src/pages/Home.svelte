@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Dashboard, Budget } from '../lib/types';
+  import type { Dashboard, Budget, Outlook } from '../lib/types';
   import { app, ui, cat, source, openTx, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { go } from '../lib/router.svelte';
@@ -15,6 +15,7 @@
   let fileInput: HTMLInputElement | undefined = $state();
   let insight = $state<{ content: string; created_at: string } | null>(null);
   let insightBusy = $state(false);
+  let outlook = $state<Outlook | null>(null);
 
   $effect(() => {
     app.dataVersion;
@@ -26,6 +27,10 @@
       .then((r) => (d = r))
       .catch((e) => e.name !== 'AbortError' && toastError(e))
       .finally(() => (loading = false));
+    api
+      .get<Outlook>('/outlook?months=3', ctrl.signal)
+      .then((r) => (outlook = r))
+      .catch(() => {});
     api
       .get<{ insight: typeof insight }>('/ai/insight' + qs({ period: key }), ctrl.signal)
       .then((r) => (insight = r.insight))
@@ -190,6 +195,22 @@
       </section>
     {/if}
 
+    {#if outlook && (outlook.pending_count > 0 || outlook.debt_remaining > 0)}
+      <section class="card">
+        <div class="card-title">Ke depan <button onclick={() => go('/pending')}>Detail</button></div>
+        <div class="stack fwd">
+          {#if outlook.pending_count > 0}
+            <div class="row between"><span>⏳ Pendapatan tertunda</span><span class="num bold good">{rp(outlook.pending_total)}</span></div>
+          {/if}
+          {#if outlook.debt_remaining > 0}
+            <button class="row between" onclick={() => go('/debts')}>
+              <span>💳 Sisa utang{outlook.debt_monthly ? ` · ${rp(outlook.debt_monthly)}/bln` : ''}</span><span class="num bold">{rp(outlook.debt_remaining)}</span>
+            </button>
+          {/if}
+        </div>
+      </section>
+    {/if}
+
     {#if d.alerts.length}
       <section class="stack alerts">
         {#each d.alerts as a, i (i)}
@@ -304,6 +325,8 @@
 </div>
 
 <style>
+  .fwd { gap: 10px; }
+  .fwd > button { width: 100%; text-align: left; }
   .ic { width: 22px; text-align: center; flex: none; }
   .top { gap: 10px; }
   .head { align-items: flex-start; }
