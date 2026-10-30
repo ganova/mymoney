@@ -254,6 +254,8 @@ CREATE TABLE receivables (
 );
 CREATE INDEX idx_recv_ledger ON receivables(ledger_id, status);
 `,
+	// v4: nomor pesanan platform pada pendapatan tertunda (agar scan ulang tidak menggandakan)
+	`ALTER TABLE receivables ADD COLUMN ref TEXT NOT NULL DEFAULT '';`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

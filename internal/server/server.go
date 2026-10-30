@@ -71,6 +71,8 @@ func (s *Server) routes() {
 
 	p("GET /api/receivables", s.handleListReceivables)
 	p("POST /api/receivables", s.handleCreateReceivable)
+	p("POST /api/receivables/scan", s.handleScanReceivables)
+	p("POST /api/receivables/bulk", s.handleBulkReceivables)
 	p("PUT /api/receivables/{id}", s.handleUpdateReceivable)
 	p("DELETE /api/receivables/{id}", s.handleDeleteReceivable)
 	p("POST /api/receivables/{id}/receive", s.handleReceiveReceivable)

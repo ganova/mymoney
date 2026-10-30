@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Outlook, Receivable } from '../lib/types';
+  import type { Outlook, Receivable, ScannedOrder } from '../lib/types';
   import { app, changed, activeAccounts, source, toast, toastError, haptic } from '../lib/state.svelte';
   import { api } from '../lib/api';
+  import { imagesToForm } from '../lib/image';
   import { back } from '../lib/router.svelte';
   import { rp, rpc, shortDate, addDays } from '../lib/format';
   import Icon from '../components/Icon.svelte';
@@ -14,6 +15,77 @@
   let edit = $state<Partial<Receivable> | null>(null);
   let recv = $state<{ r: Receivable; amount: number; account_id: number; date: string } | null>(null);
   let busy = $state(false);
+
+  // --- baca dari screenshot daftar pesanan ---
+  type Cand = ScannedOrder & { on: boolean };
+  let fileInput: HTMLInputElement | undefined = $state();
+  let scanning = $state(false);
+  let cands = $state<Cand[] | null>(null);
+  let scanNote = $state('');
+  let scanMode = $state('');
+  let fee = $state(readFee());
+
+  function readFee(): number {
+    try {
+      return Number(localStorage.getItem('mymoney.platformFee')) || 0;
+    } catch {
+      return 0;
+    }
+  }
+  function setFee(v: number) {
+    fee = Math.min(Math.max(v || 0, 0), 90);
+    try {
+      localStorage.setItem('mymoney.platformFee', String(fee));
+    } catch {
+      /* abaikan */
+    }
+  }
+  const net = (gross: number) => Math.round(gross * (1 - fee / 100));
+
+  async function pickImages(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+    scanning = true;
+    try {
+      const res = await api.post<{ orders: ScannedOrder[]; notes: string; mode: string }>('/receivables/scan', await imagesToForm(files, {}));
+      cands = res.orders.map((o) => ({ ...o, on: !o.exists }));
+      scanNote = res.notes;
+      scanMode = res.mode;
+    } catch (err) {
+      toastError(err);
+    } finally {
+      scanning = false;
+    }
+  }
+
+  async function saveCands() {
+    if (!cands) return;
+    const list = cands.filter((c) => c.on);
+    if (!list.length) return toast('Pilih minimal satu pesanan', { kind: 'error' });
+    busy = true;
+    try {
+      await api.post('/receivables/bulk', {
+        items: list.map((c) => ({
+          name: c.name,
+          client: c.client,
+          ref: c.ref,
+          amount: net(c.amount),
+          expected_date: c.due_date,
+          income_source_id: freelance,
+          note: [c.stage, c.status, fee ? `harga ${rp(c.amount)} − potongan ${fee}%` : ''].filter(Boolean).join(' · '),
+        })),
+      });
+      toast(`${list.length} proyek tersimpan`);
+      cands = null;
+      await changed();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      busy = false;
+    }
+  }
 
   async function load() {
     try {
@@ -103,7 +175,13 @@
 <div class="page stack">
   <header class="page-head">
     <button class="back" onclick={() => back('/more')}><Icon name="chevron-left" /> Lainnya</button>
-    <button class="btn sm primary" onclick={() => open()}><Icon name="plus" size={18} /> Proyek</button>
+    <div class="row" style="gap:8px">
+      <button class="btn sm" onclick={() => fileInput?.click()} disabled={scanning}>
+        {#if scanning}<span class="spinner"></span>{:else}<Icon name="camera" size={18} />{/if} Baca gambar
+      </button>
+      <button class="btn sm primary" onclick={() => open()}><Icon name="plus" size={18} /> Proyek</button>
+    </div>
+    <input bind:this={fileInput} type="file" accept="image/*" multiple class="hidden" onchange={pickImages} />
   </header>
   <h1 class="title">Pendapatan Tertunda</h1>
 
@@ -175,6 +253,38 @@
     </div>
   {/if}
 </div>
+
+<Sheet open={!!cands} onclose={() => (cands = null)} title="Pesanan terbaca" full>
+  {#if cands}
+    <div class="stack">
+      {#if scanNote}<div class="alert {scanMode === 'offline' ? 'warn' : 'info'}"><span class="grow small">{scanNote}</span></div>{/if}
+      <div class="field">
+        <span>Potongan platform (%) — opsional</span>
+        <div class="row">
+          <input class="input grow" type="number" inputmode="decimal" min="0" max="90" step="0.5" value={fee} onchange={(e) => setFee(Number((e.currentTarget as HTMLInputElement).value))} />
+          <span class="tiny muted">harga di layar dipotong sebelum dicatat</span>
+        </div>
+      </div>
+      {#each cands as c, i (i)}
+        <div class="card cand" class:off={!c.on}>
+          <div class="row">
+            <button class="check" class:on={c.on} onclick={() => (c.on = !c.on)} aria-label="Pilih">
+              {#if c.on}<Icon name="check" size={16} stroke={3} />{/if}
+            </button>
+            <div class="grow">
+              <input class="input name" bind:value={c.name} aria-label="Nama proyek" />
+              <div class="tiny muted">{[c.client, c.ref, c.stage, c.due_date ? 'estimasi ' + shortDate(c.due_date) : 'tanpa tanggal'].filter(Boolean).join(' · ')}</div>
+              {#if c.exists}<span class="badge bad">sudah tercatat</span>{/if}
+            </div>
+            <div class="num bold good">{rp(net(c.amount))}</div>
+          </div>
+        </div>
+      {/each}
+      <div class="row between small"><span>{cands.filter((c) => c.on).length} dipilih</span><b class="num good">{rp(cands.filter((c) => c.on).reduce((s, c) => s + net(c.amount), 0))}</b></div>
+      <button class="btn primary" onclick={saveCands} disabled={busy}>Simpan sebagai pendapatan tertunda</button>
+    </div>
+  {/if}
+</Sheet>
 
 <Sheet open={!!edit} onclose={() => (edit = null)} title={edit?.id ? 'Ubah proyek' : 'Proyek baru'}>
   {#if edit}
@@ -252,4 +362,8 @@
   .item { display: flex; flex-direction: column; gap: 10px; }
   .top { width: 100%; text-align: left; align-items: flex-start; }
   .left { text-align: left; }
+  .cand.off { opacity: 0.55; }
+  .cand .name { padding: 6px 8px; min-height: 36px; font-weight: 600; }
+  .check { width: 26px; height: 26px; flex: none; border-radius: 8px; border: 2px solid var(--muted); display: grid; place-items: center; color: #fff; }
+  .check.on { background: var(--accent); border-color: var(--accent); }
 </style>

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/ganova/mymoney/internal/ai"
 	"github.com/ganova/mymoney/internal/config"
+	"github.com/ganova/mymoney/internal/ocr"
 	"github.com/ganova/mymoney/internal/store"
 )
 
@@ -267,5 +270,71 @@ func TestReceivablesAPI(t *testing.T) {
 	code, _ = c.do("PUT", "/api/receivables/"+strconv.FormatInt(rec.ID, 10), map[string]any{"name": "x", "amount": 1}, "X-Ledger", "1")
 	if code != 404 {
 		t.Fatalf("lintas buku: %d", code)
+	}
+}
+
+func TestScanReceivablesOffline(t *testing.T) {
+	if !ocr.Available() {
+		t.Skip("tesseract tidak terpasang")
+	}
+	c, _ := newTestServer(t, "")
+	data, err := os.ReadFile("testdata/fastwork.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("images", "fastwork.png")
+	fw.Write(data)
+	mw.Close()
+	req, _ := http.NewRequest("POST", c.base+"/api/receivables/scan", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("X-Ledger", "2")
+	res, err := c.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var out struct {
+		Mode   string `json:"mode"`
+		Orders []struct {
+			Ref     string `json:"ref"`
+			Amount  int64  `json:"amount"`
+			DueDate string `json:"due_date"`
+			Exists  bool   `json:"exists"`
+		} `json:"orders"`
+	}
+	json.NewDecoder(res.Body).Decode(&out)
+	if res.StatusCode != 200 || out.Mode != "offline" || len(out.Orders) != 4 {
+		t.Fatalf("scan: %d %+v", res.StatusCode, out)
+	}
+	sum := int64(0)
+	for _, o := range out.Orders {
+		sum += o.Amount
+	}
+	if sum != 4_750_000+1_000_000+8_700_000+3_060_000 || out.Orders[1].Ref != "WTVKOH4E" || out.Orders[1].DueDate == "" {
+		t.Fatalf("isi scan: %+v", out.Orders)
+	}
+	// simpan lalu scan ulang: ditandai sudah ada
+	items := []map[string]any{{"name": "Web Digital space komputer", "ref": out.Orders[1].Ref, "amount": out.Orders[1].Amount, "client": "Fastwork"}}
+	if code, o := c.do("POST", "/api/receivables/bulk", map[string]any{"items": items}, "X-Ledger", "2"); code != 201 {
+		t.Fatalf("bulk: %d %s", code, o)
+	}
+	body2 := bytes.Buffer{}
+	mw2 := multipart.NewWriter(&body2)
+	fw2, _ := mw2.CreateFormFile("images", "fastwork.png")
+	fw2.Write(data)
+	mw2.Close()
+	req2, _ := http.NewRequest("POST", c.base+"/api/receivables/scan", &body2)
+	req2.Header.Set("Content-Type", mw2.FormDataContentType())
+	req2.Header.Set("X-Ledger", "2")
+	res2, err := c.http.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res2.Body.Close()
+	json.NewDecoder(res2.Body).Decode(&out)
+	if !out.Orders[1].Exists || out.Orders[0].Exists {
+		t.Fatalf("deteksi duplikat: %+v", out.Orders)
 	}
 }

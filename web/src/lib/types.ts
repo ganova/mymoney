@@ -244,6 +244,17 @@ export interface Receivable {
   created_at: string;
 }
 
+export interface ScannedOrder {
+  ref: string;
+  name: string;
+  client: string;
+  amount: number;
+  due_date: string;
+  status: string;
+  stage: string;
+  exists: boolean;
+}
+
 export interface OutlookMonth {
   key: string;
   label: string;

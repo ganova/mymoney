@@ -71,6 +71,34 @@ func langs(bin string) string {
 
 // Read mengubah gambar menjadi teks (bahasa Indonesia + Inggris).
 func Read(ctx context.Context, img []byte) (string, error) {
+	return read(ctx, img, "6")
+}
+
+// ReadTable membaca tampilan tabel/daftar berkolom (mis. daftar pesanan).
+// Gambar kecil diperbesar dulu, lalu dibaca dengan dua mode tata letak
+// (per baris dan per blok) karena hasil terbaiknya berbeda antar gambar;
+// pemanggil memilih tafsiran yang paling masuk akal.
+func ReadTable(ctx context.Context, img []byte) ([]string, error) {
+	big := upscale(img)
+	var out []string
+	var firstErr error
+	for _, psm := range []string{"6", "4"} {
+		t, err := read(ctx, big, psm)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		return nil, firstErr
+	}
+	return out, nil
+}
+
+func read(ctx context.Context, img []byte, psm string) (string, error) {
 	bin := tesseractPath()
 	if bin == "" {
 		return "", ErrUnavailable
@@ -78,8 +106,10 @@ func Read(ctx context.Context, img []byte) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	// psm 6: blok teks seragam — cocok untuk daftar mutasi
-	cmd := exec.CommandContext(ctx, bin, "stdin", "stdout", "-l", langs(bin), "--psm", "6")
+	cmd := exec.CommandContext(ctx, bin, "stdin", "stdout", "-l", langs(bin), "--psm", psm)
 	hideWindow(cmd)
+	// satu thread per proses: beberapa OCR berjalan bersamaan tanpa saling memperlambat
+	cmd.Env = append(os.Environ(), "OMP_THREAD_LIMIT=1")
 	cmd.Stdin = bytes.NewReader(img)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr

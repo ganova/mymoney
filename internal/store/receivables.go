@@ -14,6 +14,7 @@ type Receivable struct {
 	ID             int64  `json:"id"`
 	Name           string `json:"name"`
 	Client         string `json:"client"` // klien / platform, mis. Fastwork
+	Ref            string `json:"ref"`    // nomor pesanan di platform
 	Amount         int64  `json:"amount"` // bersih yang akan diterima
 	ExpectedDate   string `json:"expected_date"`
 	IncomeSourceID *int64 `json:"income_source_id"`
@@ -24,12 +25,12 @@ type Receivable struct {
 	CreatedAt      string `json:"created_at"`
 }
 
-const recvCols = `id, name, client, amount, expected_date, income_source_id, status, note, tx_id, received_at, created_at`
+const recvCols = `id, name, client, ref, amount, expected_date, income_source_id, status, note, tx_id, received_at, created_at`
 
 func scanRecv(sc interface{ Scan(...any) error }) (Receivable, error) {
 	var r Receivable
 	var src, tx sql.NullInt64
-	err := sc.Scan(&r.ID, &r.Name, &r.Client, &r.Amount, &r.ExpectedDate, &src, &r.Status, &r.Note, &tx, &r.ReceivedAt, &r.CreatedAt)
+	err := sc.Scan(&r.ID, &r.Name, &r.Client, &r.Ref, &r.Amount, &r.ExpectedDate, &src, &r.Status, &r.Note, &tx, &r.ReceivedAt, &r.CreatedAt)
 	r.IncomeSourceID, r.TxID = ptr(src), ptr(tx)
 	return r, err
 }
@@ -64,6 +65,7 @@ func (s *Store) GetReceivable(ctx context.Context, id int64) (Receivable, error)
 func (r *Receivable) normalize() error {
 	r.Name = strings.TrimSpace(r.Name)
 	r.Client = strings.TrimSpace(r.Client)
+	r.Ref = strings.TrimSpace(r.Ref)
 	if r.Name == "" {
 		return invalid("nama proyek wajib diisi")
 	}
@@ -94,8 +96,8 @@ func (s *Store) CreateReceivable(ctx context.Context, r Receivable) (Receivable,
 		return r, err
 	}
 	r.Status = "pending"
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO receivables (ledger_id, name, client, amount, expected_date, income_source_id, status, note)
-		VALUES (?,?,?,?,?,?,?,?)`, LedgerID(ctx), r.Name, r.Client, r.Amount, r.ExpectedDate, nullInt(r.IncomeSourceID), r.Status, r.Note)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO receivables (ledger_id, name, client, ref, amount, expected_date, income_source_id, status, note)
+		VALUES (?,?,?,?,?,?,?,?,?)`, LedgerID(ctx), r.Name, r.Client, strings.TrimSpace(r.Ref), r.Amount, r.ExpectedDate, nullInt(r.IncomeSourceID), r.Status, r.Note)
 	if err != nil {
 		return r, err
 	}
@@ -177,4 +179,49 @@ func (s *Store) ReceiveReceivable(ctx context.Context, id, accountID, amount int
 	}
 	r, err = s.GetReceivable(ctx, id)
 	return r, &tx, err
+}
+
+// HasReceivable melaporkan apakah pendapatan tertunda yang sama sudah tercatat
+// (nomor pesanan sama, atau nama + nominal sama) di buku aktif.
+func (s *Store) HasReceivable(ctx context.Context, ref, name string, amount int64) bool {
+	var n int
+	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM receivables WHERE ledger_id = ? AND status != 'cancelled'
+		AND ((? != '' AND ref = ?) OR (lower(name) = lower(?) AND amount = ?))`, LedgerID(ctx), ref, ref, strings.TrimSpace(name), amount).Scan(&n)
+	return n > 0
+}
+
+// CreateReceivables menyimpan banyak pendapatan tertunda sekaligus (semua atau tidak sama sekali).
+func (s *Store) CreateReceivables(ctx context.Context, list []Receivable) ([]Receivable, error) {
+	for i := range list {
+		if err := list[i].normalize(); err != nil {
+			return nil, invalid("baris %d: %s", i+1, err.Error())
+		}
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ids := []int64{}
+	for _, r := range list {
+		res, err := tx.ExecContext(ctx, `INSERT INTO receivables (ledger_id, name, client, ref, amount, expected_date, income_source_id, status, note)
+			VALUES (?,?,?,?,?,?,?,'pending',?)`, LedgerID(ctx), r.Name, r.Client, r.Ref, r.Amount, r.ExpectedDate, nullInt(r.IncomeSourceID), r.Note)
+		if err != nil {
+			return nil, err
+		}
+		id, _ := res.LastInsertId()
+		ids = append(ids, id)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	out := make([]Receivable, 0, len(ids))
+	for _, id := range ids {
+		r, err := s.GetReceivable(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
 }
