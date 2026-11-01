@@ -236,3 +236,9 @@ func (s *Service) codexExtractPrompt(c *Context, in ExtractInput, p period.Perio
 	b.WriteString("\nEkstrak semua transaksinya sekarang.")
 	return b.String()
 }
+
+// codexTextSchema: skema untuk jawaban berbentuk teks bebas lewat Codex.
+func codexTextSchema() map[string]any {
+	return map[string]any{"type": "object", "additionalProperties": false, "required": []string{"text"},
+		"properties": map[string]any{"text": map[string]any{"type": "string"}}}
+}

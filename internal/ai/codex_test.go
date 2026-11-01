@@ -35,3 +35,17 @@ func TestCodexAsk(t *testing.T) {
 		t.Fatalf("hasil tak terduga: %+v", res)
 	}
 }
+
+func TestCodexBudgetAndInsight(t *testing.T) {
+	budget := `{"lines":[{"label":"Cicilan rumah","category_id":null,"new_category":{"name":"Cicilan Rumah","group":"Tagihan Bulanan","icon":"🏠","kind":"expense"},"amount":4650000,"due_day":28,"note":""}],"summary":"Total pengeluaran Rp4.650.000."}`
+	s := New(Config{CodexPath: fakeCodex(t, budget)}, testStore(t))
+	out, err := s.SuggestBudget(t.Context(), "cicilan rumah 4650000 tiap bulan")
+	if err != nil || len(out.Lines) != 1 || out.Lines[0].Amount != 4650000 || out.Lines[0].NewCategory == nil {
+		t.Fatalf("budget via codex: %+v %v", out, err)
+	}
+	s = New(Config{CodexPath: fakeCodex(t, `{"text":"### Sorotan\n- Aman."}`)}, testStore(t))
+	txt, err := s.Insight(t.Context(), "2026-11")
+	if err != nil || txt != "### Sorotan\n- Aman." {
+		t.Fatalf("insight via codex: %q %v", txt, err)
+	}
+}

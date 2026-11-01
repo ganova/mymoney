@@ -200,6 +200,3 @@ func jsonFormat(schema map[string]any) anthropic.BetaJSONOutputFormatParam {
 func userText(text string) anthropic.BetaMessageParam {
 	return anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(text))
 }
-
-// ErrNeedAPI: fitur yang butuh API key Claude (tidak tersedia lewat Codex CLI).
-var ErrNeedAPI = fmt.Errorf("%w (Codex CLI hanya untuk catat via kalimat, screenshot, dan tanya-jawab)", ErrDisabled)

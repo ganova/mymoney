@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -85,24 +86,35 @@ type BudgetSuggestion struct {
 
 // SuggestBudget mengubah daftar/kalimat bebas menjadi baris budget.
 func (s *Service) SuggestBudget(ctx context.Context, text string) (*BudgetSuggestion, error) {
-	if !s.apiReady() {
-		return nil, ErrNeedAPI
+	if !s.Enabled() {
+		return nil, ErrDisabled
 	}
 	c, err := LoadContext(ctx, s.store)
 	if err != nil {
 		return nil, err
 	}
-	p := s.baseParams(s.cfg.VisionEffort, 32000)
-	p.System = s.systemBlocks(c, budgetPrompt)
-	p.Messages = []anthropic.BetaMessageParam{userText("Rencana budget saya:\n<data>\n" + strings.TrimSpace(text) + "\n</data>")}
-	p.OutputConfig.Format = jsonFormat(budgetSchema())
-	msg, err := s.send(ctx, "budget", p)
-	if err != nil {
-		return nil, err
-	}
+	userMsg := "Rencana budget saya:\n<data>\n" + strings.TrimSpace(text) + "\n</data>"
 	var out BudgetSuggestion
-	if err := decodeJSON(msg, &out); err != nil {
-		return nil, err
+	if s.apiReady() {
+		p := s.baseParams(s.cfg.VisionEffort, 32000)
+		p.System = s.systemBlocks(c, budgetPrompt)
+		p.Messages = []anthropic.BetaMessageParam{userText(userMsg)}
+		p.OutputConfig.Format = jsonFormat(budgetSchema())
+		msg, err := s.send(ctx, "budget", p)
+		if err != nil {
+			return nil, err
+		}
+		if err := decodeJSON(msg, &out); err != nil {
+			return nil, err
+		}
+	} else {
+		raw, err := s.runCodex(ctx, budgetPrompt+"\n\n# Data pengguna\n"+c.Describe()+"\n\n"+userMsg, budgetSchema(), nil)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, fmt.Errorf("jawaban Codex tidak valid: %w", err)
+		}
 	}
 	valid := out.Lines[:0]
 	for _, l := range out.Lines {
@@ -139,8 +151,8 @@ Jangan mengarang data yang tidak ada. Maksimal ±200 kata.`
 
 // Insight menulis analisis AI untuk satu periode.
 func (s *Service) Insight(ctx context.Context, key string) (string, error) {
-	if !s.apiReady() {
-		return "", ErrNeedAPI
+	if !s.Enabled() {
+		return "", ErrDisabled
 	}
 	c, err := LoadContext(ctx, s.store)
 	if err != nil {
@@ -167,6 +179,19 @@ func (s *Service) Insight(ctx context.Context, key string) (string, error) {
 	b.WriteString("\nTren beberapa periode (periode | pemasukan | pengeluaran):\n")
 	for _, h := range r.History {
 		fmt.Fprintf(&b, "- %s | %s | %s\n", h.Label, money.Format(h.Income), money.Format(h.Expense))
+	}
+	if !s.apiReady() {
+		raw, err := s.runCodex(ctx, insightPrompt+"\n\nJawab dalam Markdown biasa, bukan JSON. Jangan menjalankan perintah apa pun.\n\n"+b.String(), codexTextSchema(), nil)
+		if err != nil {
+			return "", err
+		}
+		var out struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return "", fmt.Errorf("jawaban Codex tidak valid: %w", err)
+		}
+		return strings.TrimSpace(out.Text), nil
 	}
 	params := s.baseParams("medium", 16000)
 	params.System = []anthropic.BetaTextBlockParam{{Text: insightPrompt}}
