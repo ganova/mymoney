@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -30,28 +31,49 @@ type askResponse struct {
 	Mode   string     `json:"mode"` // ai | offline
 }
 
-// ask menjalankan asisten AI, dengan parser offline sebagai cadangan.
-func (s *Server) ask(ctx context.Context, history []ai.HistoryItem, text, source string) (*askResponse, error) {
+// aiOn melaporkan apakah AI dipakai untuk permintaan ini: tersedia (Codex CLI
+// atau API key) dan tidak dimatikan lewat pengaturan "Tanpa AI".
+func (s *Server) aiOn(ctx context.Context) bool {
 	if !s.ai.Enabled() {
-		drafts, err := ai.ParseOffline(ctx, s.store, text, source)
-		if err != nil {
-			return nil, err
-		}
-		reply := "Mode gratis (tanpa AI): draf dibuat dari kata kunci & kebiasaanmu. Cek sebelum menyimpan."
-		if len(drafts) == 0 {
-			reply = "Fitur tanya-jawab butuh AI. Isi ANTHROPIC_API_KEY di file .env, atau ketik transaksi seperti \"makan siang 25rb\"."
-		}
-		return &askResponse{Reply: reply, Drafts: nonNil(drafts), Mode: "offline"}, nil
+		return false
 	}
-	res, err := s.ai.Ask(ctx, history, text, source)
-	if err != nil {
-		drafts, perr := ai.ParseOffline(ctx, s.store, text, source)
-		if perr == nil && len(drafts) > 0 {
-			return &askResponse{Reply: "⚠️ " + err.Error() + ". Draf dibuat dengan parser offline — cek sebelum disimpan.", Drafts: drafts, Mode: "offline"}, nil
+	st, err := s.store.GetSettings(ctx)
+	return err != nil || st.AIMode != "offline"
+}
+
+// ask mencatat/menjawab: AI bila aktif, dan bila AI gagal atau dimatikan jatuh
+// ke parser offline (kata kunci + kebiasaan). Tidak pernah mengembalikan error
+// hanya karena AI bermasalah; pengguna selalu mendapat jawaban yang bisa dibaca.
+func (s *Server) ask(ctx context.Context, history []ai.HistoryItem, text, source string) (*askResponse, error) {
+	var aiErr error
+	if s.aiOn(ctx) {
+		res, err := s.ai.Ask(ctx, history, text, source)
+		if err == nil {
+			return &askResponse{Reply: res.Reply, Drafts: nonNil(res.Drafts), Mode: "ai"}, nil
 		}
+		aiErr = err
+		log.Printf("AI gagal, memakai mode tanpa AI: %v", err)
+	}
+	drafts, err := ai.ParseOffline(ctx, s.store, text, source)
+	if err != nil {
 		return nil, err
 	}
-	return &askResponse{Reply: res.Reply, Drafts: nonNil(res.Drafts), Mode: "ai"}, nil
+	resp := &askResponse{Drafts: nonNil(drafts), Mode: "offline"}
+	switch {
+	case aiErr != nil && len(drafts) > 0:
+		resp.Reply = "⚠️ AI sedang tidak bisa diakses (" + aiErr.Error() + "). Draf dibuat tanpa AI — cek sebelum menyimpan."
+	case aiErr != nil:
+		resp.Reply = "⚠️ AI sedang tidak bisa diakses (" + aiErr.Error() + "), dan mode tanpa AI belum bisa memahami kalimat ini. Coba tulis seperti \"makan siang 25rb\" atau \"gaji cmw 11jt\"."
+	case s.ai.Enabled() && len(drafts) > 0:
+		resp.Reply = "Mode tanpa AI (sesuai pengaturan): draf dibuat dari kata kunci & kebiasaanmu. Cek sebelum menyimpan."
+	case s.ai.Enabled():
+		resp.Reply = "Mode tanpa AI belum bisa memahami kalimat ini. Coba tulis seperti \"makan siang 25rb\", atau aktifkan AI di Pengaturan."
+	case len(drafts) > 0:
+		resp.Reply = "Mode gratis (tanpa AI): draf dibuat dari kata kunci & kebiasaanmu. Cek sebelum menyimpan."
+	default:
+		resp.Reply = "Fitur tanya-jawab butuh AI (pasang Codex CLI atau isi ANTHROPIC_API_KEY). Tanpa AI, ketik transaksi seperti \"makan siang 25rb\"."
+	}
+	return resp, nil
 }
 
 func nonNil(d []ai.Draft) []ai.Draft {
@@ -86,18 +108,20 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 // extract membaca transaksi dari screenshot/teks: pakai AI bila aktif,
 // selain itu (atau bila AI gagal) pakai OCR + parser offline yang gratis.
 func (s *Server) extract(ctx context.Context, in ai.ExtractInput) (*ai.ExtractResult, error) {
-	if !s.ai.Enabled() {
+	if !s.aiOn(ctx) {
 		return s.extractOffline(ctx, in)
 	}
 	res, err := s.ai.Extract(ctx, in)
 	if err == nil {
 		return res, nil
 	}
-	if off, oerr := s.extractOffline(ctx, in); oerr == nil && len(off.Drafts) > 0 {
-		off.Notes = "⚠️ " + err.Error() + ". " + off.Notes
+	log.Printf("AI gagal membaca mutasi, memakai OCR offline: %v", err)
+	off, oerr := s.extractOffline(ctx, in)
+	if oerr == nil && len(off.Drafts) > 0 {
+		off.Notes = "⚠️ AI sedang tidak bisa diakses (" + err.Error() + "). Dibaca tanpa AI — cek sebelum menyimpan. " + off.Notes
 		return off, nil
 	}
-	return nil, err
+	return nil, fmt.Errorf("AI gagal (%s) dan pembaca tanpa AI juga tidak menemukan transaksi", err.Error())
 }
 
 func (s *Server) extractOffline(ctx context.Context, in ai.ExtractInput) (*ai.ExtractResult, error) {
@@ -375,7 +399,7 @@ func (s *Server) handleAIUsage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"since": p.StartStr(), "usage": usage, "enabled": s.ai.Enabled(), "model": s.ai.Model()})
+	writeJSON(w, 200, map[string]any{"since": p.StartStr(), "usage": usage, "enabled": s.aiOn(r.Context()), "model": s.ai.Model()})
 }
 
 // ---------- iOS Shortcuts ----------
@@ -641,3 +665,19 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func strPtr(s string) *string { return &s }
+
+// handleAITest menguji koneksi AI (Codex CLI atau API) agar masalahnya terlihat jelas.
+func (s *Server) handleAITest(w http.ResponseWriter, r *http.Request) {
+	if !s.ai.Enabled() {
+		writeJSON(w, 200, map[string]any{"ok": false, "message": "AI belum tersedia: pasang Codex CLI (npm i -g @openai/codex lalu codex login) atau isi ANTHROPIC_API_KEY, lalu jalankan ulang MyMoney."})
+		return
+	}
+	start := time.Now()
+	via, err := s.ai.Ping(r.Context())
+	ms := time.Since(start).Milliseconds()
+	if err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "message": err.Error(), "ms": ms})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true, "message": "Terhubung lewat " + via, "ms": ms})
+}

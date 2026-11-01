@@ -140,8 +140,15 @@ func (s *Service) send(ctx context.Context, kind string, p anthropic.BetaMessage
 }
 
 func (s *Service) logErr(ctx context.Context, kind string, start time.Time, err error) error {
-	s.store.LogAI(ctx, store.AILog{Kind: kind, Model: s.cfg.Model, DurationMS: time.Since(start).Milliseconds(), Error: err.Error()})
+	model := s.cfg.Model
+	if kind == "codex" {
+		model = "Codex CLI"
+	}
+	s.store.LogAI(ctx, store.AILog{Kind: kind, Model: model, DurationMS: time.Since(start).Milliseconds(), Error: err.Error()})
 	log.Printf("ai %s: %v", kind, err)
+	if kind == "codex" {
+		return err // sudah berupa pesan yang ramah
+	}
 	return friendlyError(err)
 }
 

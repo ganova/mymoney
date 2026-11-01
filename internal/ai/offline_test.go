@@ -111,3 +111,17 @@ func TestParseOfflineLearnsAndEstimates(t *testing.T) {
 		t.Fatalf("got %+v", d)
 	}
 }
+
+func TestQuestionsAreNotTransactions(t *testing.T) {
+	s := testStore(t)
+	for _, q := range []string{"berapa sisa budget makan?", "pengeluaran terbesar bulan ini apa?", "bandingkan dengan bulan lalu"} {
+		d, err := ParseOffline(t.Context(), s, q, "ai_text")
+		if err != nil || len(d) != 0 {
+			t.Errorf("%q harus tanpa draf: %+v %v", q, d, err)
+		}
+	}
+	// kalimat bernominal tetap dicatat meski berawalan kata tanya
+	if d, _ := ParseOffline(t.Context(), s, "makan siang 25rb", "ai_text"); len(d) != 1 {
+		t.Errorf("transaksi biasa harus tetap terbaca: %+v", d)
+	}
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { APIToken, Rule, Settings } from '../lib/types';
-  import { app, acc, cat, activeAccounts, changed, toast, toastError } from '../lib/state.svelte';
+  import { app, acc, cat, activeAccounts, changed, loadBootstrap, toast, toastError } from '../lib/state.svelte';
   import { api } from '../lib/api';
   import { back } from '../lib/router.svelte';
   import { rp } from '../lib/format';
@@ -15,6 +15,8 @@
   let rules = $state<Rule[]>([]);
   let showRules = $state(false);
   let usage = $state<{ since: string; usage: Usage[] } | null>(null);
+  let aiTest = $state<{ ok: boolean; message: string; ms?: number } | null>(null);
+  let aiTesting = $state(false);
   let theme = $state(localStorage.getItem('mm_theme') ?? 'auto');
 
   // harga per juta token (USD): input, output — perkiraan untuk tampilan saja
@@ -41,6 +43,31 @@
     const p = price[u.model];
     if (!p) return 0;
     return (u.input_tokens * p[0] + u.cache_write_tokens * p[0] * 1.25 + u.cache_read_tokens * p[0] * 0.1 + u.output_tokens * p[1]) / 1e6;
+  }
+
+  async function setAIMode(mode: 'ai' | 'offline') {
+    if (s.ai_mode === mode) return;
+    s.ai_mode = mode;
+    aiTest = null;
+    try {
+      app.settings = await api.put<Settings>('/settings', { ...s, ai_mode: mode });
+      await loadBootstrap();
+      toast(mode === 'ai' ? 'AI dipakai (otomatis tanpa AI bila gagal)' : 'Mode tanpa AI');
+    } catch (e) {
+      toastError(e);
+    }
+  }
+
+  async function testAI() {
+    aiTesting = true;
+    aiTest = null;
+    try {
+      aiTest = await api.post<{ ok: boolean; message: string; ms?: number }>('/ai/test');
+    } catch (e) {
+      aiTest = { ok: false, message: (e as Error).message };
+    } finally {
+      aiTesting = false;
+    }
   }
 
   async function save() {
@@ -137,14 +164,34 @@
 
   <div class="section-label">AI</div>
   <div class="card stack">
-    <div class="row between">
-      <span>Status</span>
-      {#if app.ai.enabled}<span class="badge good">● Aktif</span>{:else}<span class="badge bad">Nonaktif</span>{/if}
+    <div class="field">
+      <span>Cara mencatat (bawaan)</span>
+      <div class="seg" role="tablist">
+        <button class:on={s.ai_mode === 'ai'} onclick={() => setAIMode('ai')}>Pakai AI</button>
+        <button class:on={s.ai_mode === 'offline'} onclick={() => setAIMode('offline')}>Tanpa AI</button>
+      </div>
+      <span class="tiny muted">
+        {#if s.ai_mode === 'ai'}
+          {app.ai.available ? 'AI membaca kalimat & screenshot. Bila AI sedang tidak bisa diakses, otomatis dibantu pencocokan kata kunci + OCR (tanpa AI).' : 'AI belum terpasang, jadi sementara memakai pencocokan kata kunci + OCR.'}
+        {:else}
+          Selalu memakai pencocokan kata kunci, kebiasaan, dan OCR di komputer ini; tidak memakai kuota AI. Tanya-jawab keuangan tidak tersedia.
+        {/if}
+      </span>
     </div>
-    {#if app.ai.enabled}
-      <div class="row between small"><span class="muted">Model</span><code>{app.ai.model}</code></div>
+    <div class="row between">
+      <span>Status AI</span>
+      {#if !app.ai.available}<span class="badge bad">Belum terpasang</span>
+      {:else if app.ai.enabled}<span class="badge good">● Aktif</span>
+      {:else}<span class="badge">Dimatikan</span>{/if}
+    </div>
+    {#if app.ai.available}
+      <div class="row between small"><span class="muted">Sumber</span><code>{app.ai.model}</code></div>
+      <button class="btn block" onclick={testAI} disabled={aiTesting}>{#if aiTesting}<span class="spinner"></span>{/if} Tes koneksi AI</button>
+      {#if aiTest}
+        <div class="alert {aiTest.ok ? 'info' : 'warn'}"><span class="grow small">{aiTest.ok ? '✅' : '⚠️'} {aiTest.message}{aiTest.ms ? ` (${(aiTest.ms / 1000).toFixed(1)} dtk)` : ''}</span></div>
+      {/if}
     {:else}
-      <p class="small text-2">Isi <code>ANTHROPIC_API_KEY</code> di file <code>.env</code> lalu jalankan ulang <code>docker compose up -d</code>. Tanpa AI, input teks tetap bisa dengan pencocokan kata kunci.</p>
+      <p class="small text-2">Pasang Codex CLI (<code>npm i -g @openai/codex</code>, lalu <code>codex login</code>) atau isi <code>ANTHROPIC_API_KEY</code> di <code>.env</code>, lalu jalankan ulang MyMoney. Tanpa AI, input teks tetap bisa dengan pencocokan kata kunci.</p>
     {/if}
     {#if usage && usage.usage.length}
       <div class="tiny muted">Pemakaian sejak {usage.since}:</div>

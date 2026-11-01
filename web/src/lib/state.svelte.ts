@@ -8,7 +8,7 @@ interface Bootstrap {
   debts: Debt[];
   period: PeriodInfo;
   today: string;
-  ai: { enabled: boolean; model: string; ocr: boolean };
+  ai: { enabled: boolean; available: boolean; mode: 'ai' | 'offline'; model: string; ocr: boolean };
   ledgers: Ledger[];
   ledger_id: number;
   income_sources: IncomeSource[];
@@ -27,13 +27,13 @@ export const app = $state({
   /** akun di buku lain, hanya untuk tujuan transfer antar buku */
   otherAccounts: [] as Account[],
   error: '',
-  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, owner_name: '' } as Settings,
+  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, ai_mode: 'ai', owner_name: '' } as Settings,
   accounts: [] as Account[],
   categories: [] as Category[],
   debts: [] as Debt[],
   period: null as PeriodInfo | null,
   today: '',
-  ai: { enabled: false, model: '', ocr: false },
+  ai: { enabled: false, available: false, mode: 'ai' as 'ai' | 'offline', model: '', ocr: false },
   version: '',
   /** naik setiap kali data berubah, agar halaman memuat ulang */
   dataVersion: 0,

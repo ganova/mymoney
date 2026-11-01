@@ -74,8 +74,25 @@ func ParseOffline(ctx context.Context, st *store.Store, text, source string) ([]
 	return out, nil
 }
 
+var questionLead = map[string]bool{
+	"berapa": true, "apa": true, "apakah": true, "bagaimana": true, "gimana": true, "kapan": true, "siapa": true,
+	"mana": true, "kenapa": true, "mengapa": true, "tampilkan": true, "lihat": true, "bandingkan": true, "jelaskan": true,
+}
+
+// isQuestion mengenali kalimat tanya/perintah (mis. "berapa sisa budget makan?").
+func isQuestion(lower string) bool {
+	if strings.Contains(lower, "?") {
+		return true
+	}
+	f := strings.Fields(lower)
+	return len(f) > 0 && questionLead[f[0]]
+}
+
 func parseSegment(ctx context.Context, st *store.Store, c *Context, seg string) (Draft, bool) {
 	lower := strings.ToLower(seg)
+	if isQuestion(lower) && len(money.Find(lower)) == 0 {
+		return Draft{}, false // pertanyaan tanpa nominal bukan transaksi
+	}
 	d := Draft{Confidence: 0.55, Date: c.Today.Format("2006-01-02")}
 
 	// tanggal

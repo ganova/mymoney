@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,6 +30,11 @@ type client struct {
 
 func newTestServer(t *testing.T, password string) (*client, *store.Store) {
 	t.Helper()
+	return newTestServerAI(t, password, ai.Config{})
+}
+
+func newTestServerAI(t *testing.T, password string, aiCfg ai.Config) (*client, *store.Store) {
+	t.Helper()
 	loc, _ := time.LoadLocation("Asia/Jakarta")
 	st, err := store.OpenMemory(loc)
 	if err != nil {
@@ -37,7 +43,7 @@ func newTestServer(t *testing.T, password string) (*client, *store.Store) {
 	t.Cleanup(func() { st.Close() })
 	cfg := config.Config{Password: password, Location: loc}
 	static := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>MyMoney</title>")}, "assets/app.js": {Data: []byte("console.log(1)")}}
-	srv, err := New(cfg, st, ai.New(ai.Config{}, st), static)
+	srv, err := New(cfg, st, ai.New(aiCfg, st), static)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,5 +342,98 @@ func TestScanReceivablesOffline(t *testing.T) {
 	json.NewDecoder(res2.Body).Decode(&out)
 	if !out.Orders[1].Exists || out.Orders[0].Exists {
 		t.Fatalf("deteksi duplikat: %+v", out.Orders)
+	}
+}
+
+// fakeCodexScript membuat program `codex` tiruan: stderr diisi errMsg dan keluar
+// dengan status 1 bila errMsg tidak kosong; selain itu menulis reply ke berkas -o.
+func fakeCodexScript(t *testing.T, errMsg, reply string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "codex")
+	body := "#!/bin/sh\nout=\nwhile [ $# -gt 0 ]; do [ \"$1\" = -o ] && out=$2; shift; done\ncat >/dev/null\n"
+	if errMsg != "" {
+		body += "echo '" + errMsg + "' >&2\nexit 1\n"
+	} else {
+		body += "cat > \"$out\" <<'EOF2'\n" + reply + "\nEOF2\n"
+	}
+	if err := os.WriteFile(p, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestAIFailureFallsBackToOffline(t *testing.T) {
+	codex := fakeCodexScript(t, `ERROR: {"type":"error","status":400,"error":{"message":"The 'gpt-5.6-sol' model requires a newer version of Codex. Please upgrade to the latest app or CLI"}}`, "")
+	c, _ := newTestServerAI(t, "", ai.Config{CodexPath: codex})
+
+	// AI gagal, tetapi kalimat dikenali parser offline → draf tetap ada
+	var res struct {
+		Reply  string `json:"reply"`
+		Mode   string `json:"mode"`
+		Drafts []struct {
+			Amount int64 `json:"amount"`
+		} `json:"drafts"`
+	}
+	if code := c.json("POST", "/api/ai/ask", map[string]string{"text": "makan siang 25rb"}, &res); code != 200 {
+		t.Fatalf("ask: %d", code)
+	}
+	if res.Mode != "offline" || len(res.Drafts) != 1 || res.Drafts[0].Amount != 25000 ||
+		!strings.Contains(res.Reply, "AI sedang tidak bisa diakses") || !strings.Contains(res.Reply, "perlu diperbarui") {
+		t.Fatalf("fallback: %+v", res)
+	}
+
+	// kalimat yang tidak dipahami parser offline: tetap 200 dengan penjelasan, bukan error
+	res.Reply = ""
+	if code := c.json("POST", "/api/ai/ask", map[string]string{"text": "berapa sisa budget makan?"}, &res); code != 200 || res.Reply == "" || len(res.Drafts) != 0 {
+		t.Fatalf("tanpa draf: code=%d %+v", code, res)
+	}
+
+	// tes koneksi menunjukkan pesan yang jelas
+	var test struct {
+		OK      bool   `json:"ok"`
+		Message string `json:"message"`
+	}
+	c.json("POST", "/api/ai/test", nil, &test)
+	if test.OK || !strings.Contains(test.Message, "npm i -g @openai/codex@latest") {
+		t.Fatalf("tes AI: %+v", test)
+	}
+}
+
+func TestAIModeSetting(t *testing.T) {
+	good := `{"reply":"Dicatat oleh AI.","transactions":[]}`
+	c, _ := newTestServerAI(t, "", ai.Config{CodexPath: fakeCodexScript(t, "", good)})
+	var boot struct {
+		Settings map[string]any `json:"settings"`
+		AI       struct {
+			Enabled   bool   `json:"enabled"`
+			Available bool   `json:"available"`
+			Mode      string `json:"mode"`
+		} `json:"ai"`
+	}
+	c.json("GET", "/api/bootstrap", nil, &boot)
+	if !boot.AI.Enabled || !boot.AI.Available || boot.AI.Mode != "ai" {
+		t.Fatalf("awal: %+v", boot.AI)
+	}
+	var out struct {
+		Reply string `json:"reply"`
+		Mode  string `json:"mode"`
+	}
+	c.json("POST", "/api/ai/ask", map[string]string{"text": "halo"}, &out)
+	if out.Mode != "ai" || out.Reply != "Dicatat oleh AI." {
+		t.Fatalf("mode ai: %+v", out)
+	}
+
+	// pilih "Tanpa AI" di pengaturan: AI tidak dipanggil, bootstrap melaporkan nonaktif
+	boot.Settings["ai_mode"] = "offline"
+	if code, b := c.do("PUT", "/api/settings", boot.Settings); code != 200 {
+		t.Fatalf("simpan: %d %s", code, b)
+	}
+	c.json("GET", "/api/bootstrap", nil, &boot)
+	if boot.AI.Enabled || !boot.AI.Available || boot.AI.Mode != "offline" {
+		t.Fatalf("setelah offline: %+v", boot.AI)
+	}
+	c.json("POST", "/api/ai/ask", map[string]string{"text": "makan siang 25rb"}, &out)
+	if out.Mode != "offline" || strings.Contains(out.Reply, "Dicatat oleh AI") || strings.Contains(out.Reply, "tidak bisa diakses") {
+		t.Fatalf("mode offline: %+v", out)
 	}
 }

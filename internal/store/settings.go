@@ -13,6 +13,9 @@ type Settings struct {
 	DefaultAccountID int64  `json:"default_account_id"`
 	AIAutosave       bool   `json:"ai_autosave"`
 	OwnerName        string `json:"owner_name"`
+	// AIMode: "ai" = pakai AI (Codex CLI / API Claude) bila tersedia, jatuh ke
+	// tanpa AI bila gagal; "offline" = selalu tanpa AI (parser kata kunci + OCR).
+	AIMode string `json:"ai_mode"`
 }
 
 // defaultAccountKey: akun bawaan disimpan per buku (buku Pribadi memakai kunci lama).
@@ -57,6 +60,10 @@ func (s *Store) GetSettings(ctx context.Context) (Settings, error) {
 		s.DB.QueryRowContext(ctx, `SELECT id FROM accounts WHERE ledger_id = ? AND archived = 0 ORDER BY sort, id LIMIT 1`, LedgerID(ctx)).Scan(&st.DefaultAccountID)
 	}
 	st.AIAutosave = m["ai_autosave"] == "true"
+	st.AIMode = "ai"
+	if m["ai_mode"] == "offline" {
+		st.AIMode = "offline"
+	}
 	st.OwnerName = m["owner_name"]
 	return st, nil
 }
@@ -66,10 +73,14 @@ func (s *Store) SaveSettings(ctx context.Context, st Settings) error {
 	if st.PeriodStartDay < 1 || st.PeriodStartDay > 31 {
 		return invalid("tanggal mulai periode harus 1–31")
 	}
+	if st.AIMode != "ai" && st.AIMode != "offline" {
+		st.AIMode = "ai"
+	}
 	vals := map[string]string{
 		"period_start_day":     strconv.Itoa(st.PeriodStartDay),
 		defaultAccountKey(ctx): strconv.FormatInt(st.DefaultAccountID, 10),
 		"ai_autosave":          strconv.FormatBool(st.AIAutosave),
+		"ai_mode":              st.AIMode,
 		"owner_name":           st.OwnerName,
 	}
 	for k, v := range vals {

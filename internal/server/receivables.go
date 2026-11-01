@@ -128,7 +128,7 @@ func (s *Server) handleScanReceivables(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var res *ai.OrderResult
 	var aiErr error
-	if s.ai.Enabled() {
+	if s.aiOn(ctx) {
 		res, aiErr = s.ai.ExtractOrders(ctx, imgs)
 	}
 	if res == nil || len(res.Orders) == 0 {

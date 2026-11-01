@@ -112,6 +112,7 @@ func (s *Server) routes() {
 	p("DELETE /api/tokens/{id}", s.handleDeleteToken)
 
 	p("POST /api/ai/ask", s.handleAsk)
+	p("POST /api/ai/test", s.handleAITest)
 	p("POST /api/ai/scan", s.handleScan)
 	p("POST /api/ai/import", s.handleImport)
 	p("POST /api/ai/budget", s.handleSuggestBudget)

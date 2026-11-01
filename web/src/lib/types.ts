@@ -4,6 +4,8 @@ export interface Settings {
   period_start_day: number;
   default_account_id: number;
   ai_autosave: boolean;
+  /** ai = pakai AI (Codex/API) bila tersedia; offline = selalu tanpa AI */
+  ai_mode: 'ai' | 'offline';
   owner_name: string;
 }
 

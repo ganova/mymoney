@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anthropics/anthropic-sdk-go"
+
 	"github.com/ganova/mymoney/internal/period"
+	"github.com/ganova/mymoney/internal/store"
 )
 
 // FindCodex mencari program Codex CLI: CODEX_PATH, PATH, atau folder npm global di Windows.
@@ -42,6 +46,68 @@ func FindCodex(explicit string) string {
 		return p
 	}
 	return ""
+}
+
+// friendlyCodexError mengubah kegagalan `codex exec` (stderr mentah berisi JSON
+// dan jejak panjang) menjadi satu kalimat yang bisa ditindaklanjuti pengguna.
+func friendlyCodexError(ctx context.Context, err error, stderr string) error {
+	low := strings.ToLower(stderr)
+	switch {
+	case ctx.Err() == context.DeadlineExceeded:
+		return fmt.Errorf("Codex terlalu lama merespons")
+	case strings.Contains(low, "newer version of codex") || strings.Contains(low, "upgrade to the latest"):
+		return fmt.Errorf("Codex CLI perlu diperbarui (jalankan: npm i -g @openai/codex@latest)")
+	case strings.Contains(low, "not logged in") || strings.Contains(low, "login") && strings.Contains(low, "required") || strings.Contains(low, "401") || strings.Contains(low, "unauthorized"):
+		return fmt.Errorf("Codex belum login (jalankan: codex login)")
+	case strings.Contains(low, "model_not_found") || strings.Contains(low, "not supported when using codex"):
+		return fmt.Errorf("model Codex tidak tersedia untuk akun ini (kosongkan CODEX_MODEL di .env)")
+	case strings.Contains(low, "rate limit") || strings.Contains(low, "usage limit") || strings.Contains(low, "429"):
+		return fmt.Errorf("kuota Codex sedang habis atau dibatasi")
+	case strings.Contains(low, "network") || strings.Contains(low, "dns") || strings.Contains(low, "connection") || strings.Contains(low, "timed out"):
+		return fmt.Errorf("Codex tidak bisa terhubung ke internet")
+	}
+	var ee *exec.Error
+	if errors.As(err, &ee) {
+		return fmt.Errorf("Codex CLI tidak ditemukan atau tidak bisa dijalankan")
+	}
+	// ambil baris error terakhir yang bermakna
+	last := ""
+	for _, l := range strings.Split(stderr, "\n") {
+		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "at ") {
+			last = l
+		}
+	}
+	if len(last) > 160 {
+		last = last[:160] + "…"
+	}
+	if last == "" {
+		return fmt.Errorf("Codex CLI gagal (%v)", err)
+	}
+	return fmt.Errorf("Codex CLI gagal: %s", last)
+}
+
+// Ping menguji koneksi AI dengan permintaan terkecil; mengembalikan nama jalur
+// yang dipakai ("Codex CLI" atau "API Claude").
+func (s *Service) Ping(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	if s.apiReady() {
+		p := s.baseParams("low", 64)
+		p.Messages = []anthropic.BetaMessageParam{userText("Balas satu kata: OK")}
+		if _, err := s.send(ctx, "ping", p); err != nil {
+			return "", err
+		}
+		return "API Claude", nil
+	}
+	if !s.codexReady() {
+		return "", ErrDisabled
+	}
+	schema := map[string]any{"type": "object", "additionalProperties": false, "required": []string{"ok"},
+		"properties": map[string]any{"ok": map[string]any{"type": "boolean"}}}
+	if _, err := s.runCodex(ctx, `Balas JSON {"ok": true}. Jangan menjalankan perintah apa pun.`, schema, nil); err != nil {
+		return "", err
+	}
+	return "Codex CLI", nil
 }
 
 func (s *Service) codexReady() bool { return s != nil && s.cfg.CodexPath != "" }
@@ -86,13 +152,9 @@ func (s *Service) runCodex(ctx context.Context, prompt string, schema map[string
 	hideWindow(cmd)
 	start := time.Now()
 	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if len(msg) > 300 {
-			msg = msg[len(msg)-300:]
-		}
-		err = fmt.Errorf("Codex CLI gagal (%v): %s. Pastikan sudah `codex login`", err, msg)
-		return nil, s.logErr(ctx, "codex", start, err)
+		return nil, s.logErr(ctx, "codex", start, friendlyCodexError(ctx, err, stderr.String()))
 	}
+	s.store.LogAI(ctx, store.AILog{Kind: "codex", Model: "Codex CLI", DurationMS: time.Since(start).Milliseconds()})
 	out, err := os.ReadFile(outFile)
 	if err != nil || len(bytes.TrimSpace(out)) == 0 {
 		return nil, fmt.Errorf("Codex CLI tidak memberi jawaban")
@@ -123,6 +185,8 @@ func codexAskSchema() map[string]any {
 }
 
 func (s *Service) codexAsk(ctx context.Context, history []HistoryItem, text, source string) (*AssistantResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
 	c, err := LoadContext(ctx, s.store)
 	if err != nil {
 		return nil, err
