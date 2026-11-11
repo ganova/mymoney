@@ -88,6 +88,22 @@
     border-top: 1px solid var(--line); background: var(--bg);
   }
   .sheet:not(:has(.foot)) .body { padding-bottom: calc(var(--safe-bottom) + 20px); }
+  /* desktop: dialog di tengah layar, bukan lembar dari bawah */
+  @media (min-width: 1024px) {
+    .backdrop { background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px); }
+    .sheet {
+      top: 50%; bottom: auto; left: 50%; right: auto; width: min(560px, calc(100vw - 48px));
+      max-height: min(86vh, 860px); border-radius: 20px; margin: 0;
+      translate: -50% -50%; animation: pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+    }
+    .sheet.full { height: min(86vh, 860px); width: min(720px, calc(100vw - 48px)); }
+    .handle { display: none; }
+    .head { padding: 14px 20px 0; touch-action: auto; }
+    .body { padding: 6px 20px 20px; }
+    .foot { padding: 12px 20px 16px; }
+  }
+  @keyframes pop { from { opacity: 0; scale: 0.96; } to { opacity: 1; scale: 1; } }
   @keyframes up { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 </style>

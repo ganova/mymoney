@@ -24,3 +24,4 @@ Aplikasi keuangan pribadi (bahasa Indonesia) untuk satu pengguna, dipakai dari S
 - Draf AI (`ai.Draft`) selalu melewati `Context.Sanitize` agar ID akun/kategori valid; pengguna mengonfirmasi sebelum disimpan (kecuali Shortcut/autosave).
 - Tanpa API key: `ai.ParseOffline` (kalimat) dan `ocr` (Tesseract + poppler untuk PDF) + `ai.ParseStatementOffline` (mutasi). `Server.extract` memakai AI bila aktif, offline bila tidak/gagal.
 - Semua teks UI dan pesan error berbahasa Indonesia.
+- Desktop (≥1024px, `ui.desktop`): `Sidebar`, panel Asisten (`Assistant docked`, `ui.dock`), `CommandPalette` (Ctrl+K), pintasan di `App.svelte`. Tata letak halaman lebar memakai `@container page (...)` pada `.page.wide`; kelas `desk-only`/`mob-only` menyembunyikan elemen per mode. Jangan mengubah tampilan ponsel saat menambah fitur desktop.

@@ -166,10 +166,15 @@
   }
 </script>
 
-<div class="page stack">
+<div class="page wide">
+<div class="stack bud">
   <header class="page-head">
     <h1>Budget</h1>
-    <button class="btn sm" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={16} /> Susun dgn AI</button>
+    <div class="row" style="gap:8px">
+      <button class="btn sm desk-only" onclick={() => openEdit()}><Icon name="plus" size={16} /> Tambah baris</button>
+      <button class="btn sm desk-only" onclick={copyPrev}><Icon name="copy" size={16} /> Salin periode lalu</button>
+      <button class="btn sm" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={16} /> Susun dgn AI</button>
+    </div>
   </header>
 
   <PeriodNav period={d?.period ?? null} onchange={(k) => (periodKey = k)} />
@@ -209,7 +214,9 @@
       </div>
     {/if}
 
+    <div class="groups">
     {#if incomeLines.length}
+      <div class="grp">
       <div class="section-label">Pemasukan</div>
       <div class="list">
         {#each incomeLines as b (b.id)}
@@ -223,9 +230,11 @@
           </button>
         {/each}
       </div>
+      </div>
     {/if}
 
     {#each groups as g (g.name)}
+      <div class="grp">
       <div class="section-label row between"><span>{g.name}</span><span class="num">{rp(g.actual)} / {rp(g.plan)}</span></div>
       <div class="list">
         {#each g.items as b (b.id)}
@@ -250,9 +259,11 @@
           </button>
         {/each}
       </div>
+      </div>
     {/each}
 
     {#if unbudgeted.length}
+      <div class="grp">
       <div class="section-label">Di luar budget</div>
       <div class="list">
         {#each unbudgeted as u (u.category_id ?? 0)}
@@ -269,10 +280,12 @@
           </div>
         {/each}
       </div>
+      </div>
     {/if}
+    </div>
 
     {#if d.budgets.length}
-      <div class="row actions">
+      <div class="row actions mob-only">
         <button class="btn grow" onclick={() => openEdit()}><Icon name="plus" size={18} /> Tambah baris</button>
         <button class="btn grow" onclick={copyPrev}><Icon name="copy" size={18} /> Salin periode lalu</button>
       </div>
@@ -281,6 +294,7 @@
   {:else}
     <div class="card skeleton" style="height:160px"></div>
   {/if}
+</div>
 </div>
 
 <!-- Editor baris -->
@@ -387,5 +401,20 @@
   .actions { margin-top: 8px; }
   .left { text-align: left; }
   .tight { padding: 12px 14px; }
+  .groups, .grp { display: contents; }
+  @container page (min-width: 760px) {
+    .bud > :global(.pnav) { max-width: 360px; }
+    .summary { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; padding: 20px 24px; }
+    .summary > :global(*) { grid-column: 1 / -1; }
+    .summary > .grid3 { grid-column: span 1; }
+    .summary > .divider { display: none; }
+    .grid3 .bold { font-size: 19px; }
+    .groups { display: block; columns: 2; column-gap: 20px; }
+    .grp { display: block; break-inside: avoid; margin-bottom: 18px; }
+    .grp > .section-label { margin-top: 0; }
+  }
+  @container page (min-width: 1180px) {
+    .groups { columns: 3; }
+  }
   .cb { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 </style>

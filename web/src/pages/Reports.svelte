@@ -60,7 +60,8 @@
   }
 </script>
 
-<div class="page stack">
+<div class="page wide">
+<div class="stack rep">
   <header class="page-head">
     <button class="back" onclick={() => back('/more')}><Icon name="chevron-left" /> Lainnya</button>
     <a class="btn sm" href={'/api/export' + qs({ period: periodKey, format: 'xlsx' })}><Icon name="download" size={16} /> Excel</a>
@@ -172,12 +173,26 @@
     <div class="card skeleton" style="height:200px"></div>
   {/if}
 </div>
+</div>
 
 <style>
   .title { font-size: 28px; font-weight: 750; margin-top: -8px; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .kpis .card { padding: 12px; }
   .kpis .bold { font-size: 14px; white-space: nowrap; letter-spacing: -0.01em; }
+  @container page (min-width: 760px) {
+    /* kolom ala masonry: kartu mengisi kolom tanpa celah kosong */
+    .rep { display: block; columns: 2; column-gap: 16px; }
+    .rep > :global(*) { column-span: all; margin-bottom: 16px; }
+    .rep > section { column-span: none; break-inside: avoid; }
+    .rep > :global(.pnav) { max-width: 360px; }
+    .kpis { gap: 14px; }
+    .kpis .card { padding: 18px 20px; }
+    .kpis .bold { font-size: 24px; margin-top: 4px; }
+  }
+  @container page (min-width: 1180px) {
+    .rep { columns: 3; }
+  }
   .dim { opacity: 0.6; }
   .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; }
   .tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }

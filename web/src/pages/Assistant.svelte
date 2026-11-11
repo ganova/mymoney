@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import type { Draft, ExtractResult } from '../lib/types';
-  import { app, ui, activeAccounts, openTx, toastError } from '../lib/state.svelte';
+  import { app, ui, activeAccounts, openTx, setDock, toastError } from '../lib/state.svelte';
   import { api } from '../lib/api';
   import { route, go } from '../lib/router.svelte';
   import { imagesToForm } from '../lib/image';
@@ -20,6 +20,9 @@
     offline?: boolean;
   };
 
+  /** docked = panel samping di desktop (bukan halaman penuh) */
+  let { docked = false }: { docked?: boolean } = $props();
+
   const STORE_KEY = 'mm_chat_v1';
   let seq = Date.now();
   let messages = $state<Msg[]>(loadHistory());
@@ -29,6 +32,7 @@
   let fileInput: HTMLInputElement | undefined = $state();
   let scanFiles = $state<File[] | null>(null);
   let bottom: HTMLDivElement | undefined = $state();
+  let pageEl: HTMLDivElement | undefined = $state();
 
   const suggestions = [
     'makan siang 25rb',
@@ -61,11 +65,30 @@
 
   async function scrollDown() {
     await tick();
-    bottom?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (docked) pageEl?.scrollTo({ top: pageEl.scrollHeight, behavior: 'smooth' });
+    else bottom?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
+  // panel samping: terima kalimat dari Beranda/palet perintah dan screenshot yang dipilih di halaman lain
+  $effect(() => {
+    if (!docked) return;
+    if (ui.ask) {
+      const q = ui.ask;
+      ui.ask = null;
+      untrack(() => send(q));
+    }
+    if (ui.pendingScan) {
+      scanFiles = ui.pendingScan;
+      ui.pendingScan = null;
+    }
+  });
+
   onMount(() => {
-    const q = route.query.q;
+    const q = docked ? '' : route.query.q;
+    if (docked) {
+      scrollDown();
+      return;
+    }
     if (q) {
       history.replaceState(null, '', '#/ai');
       send(q);
@@ -200,17 +223,20 @@
   }
 </script>
 
-<div class="page chat-page">
+<div class="page chat-page" class:docked bind:this={pageEl}>
   <header class="page-head">
     <div>
       <h1>Asisten</h1>
-      <div class="small muted">{app.ai.enabled ? 'Catat atau tanya apa saja' : 'Mode gratis (tanpa AI) — catat & scan screenshot'}</div>
+      {#if !docked}<div class="small muted">{app.ai.enabled ? 'Catat atau tanya apa saja' : 'Mode gratis (tanpa AI) — catat & scan screenshot'}</div>{/if}
     </div>
     <div class="row" style="gap:4px">
       {#if messages.length}
         <button class="icon-btn" onclick={clearChat} aria-label="Bersihkan percakapan"><Icon name="trash" size={20} /></button>
       {/if}
       <button class="btn sm" onclick={() => openTx()}><Icon name="plus" size={18} /> Manual</button>
+      {#if docked}
+        <button class="icon-btn" onclick={() => setDock(false)} aria-label="Tutup panel Asisten" title="Tutup (Ctrl J)"><Icon name="x" size={20} /></button>
+      {/if}
     </div>
   </header>
 
@@ -255,13 +281,13 @@
   </div>
 </div>
 
-<form class="composer" onsubmit={(e) => { e.preventDefault(); send(); }}>
+<form class="composer" class:docked onsubmit={(e) => { e.preventDefault(); send(); }}>
   <button type="button" class="icon-btn cam" onclick={() => fileInput?.click()} aria-label="Scan screenshot" disabled={busy}><Icon name="camera" /></button>
   <textarea
     bind:this={ta}
     bind:value={text}
     rows="1"
-    placeholder="mis. makan siang 25rb pakai gopay"
+    placeholder={docked ? 'Catat atau tanya…' : 'mis. makan siang 25rb pakai gopay'}
     enterkeyhint="send"
     oninput={autoGrow}
     onkeydown={onKey}
@@ -322,7 +348,7 @@
   @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
   .spacer { height: 1px; }
   .composer {
-    position: fixed; left: 0; right: 0; z-index: 30; max-width: 640px; margin: 0 auto;
+    position: fixed; left: var(--side-w); right: var(--dock-w); z-index: 30; max-width: 640px; margin: 0 auto;
     bottom: calc(var(--tabbar-h) + var(--safe-bottom));
     display: flex; align-items: flex-end; gap: 6px; padding: 8px 10px;
     background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -334,6 +360,13 @@
   }
   .composer textarea:focus { border-color: var(--accent); }
   .cam { background: var(--surface); box-shadow: var(--shadow); }
+  /* panel samping desktop */
+  .chat-page.docked { flex: 1; min-height: 0; max-width: none; margin: 0; overflow-y: auto; padding: 14px 16px 12px; }
+  .chat-page.docked .page-head { position: sticky; top: -14px; z-index: 2; background: var(--bg); margin: -14px -16px 8px; padding: 12px 12px 8px 16px; border-bottom: 1px solid var(--line); }
+  .chat-page.docked h1 { font-size: 20px; }
+  .chat-page.docked .bubble-msg { font-size: 15px; max-width: 92%; }
+  .chat-page.docked .welcome h2 { font-size: 19px; }
+  .composer.docked { position: static; max-width: none; margin: 0; flex: none; border-top: 1px solid var(--line); background: var(--bg); padding: 10px 12px 12px; }
   .send { width: 44px; height: 44px; border-radius: 22px; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; }
   .send:disabled { opacity: 0.4; }
 </style>

@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { Dashboard, Budget, Outlook } from '../lib/types';
-  import { app, ui, cat, source, openTx, toastError } from '../lib/state.svelte';
+  import { app, ui, cat, source, openTx, askAssistant, setDock, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { go } from '../lib/router.svelte';
   import { rp, rpc, pct, greeting, shortDate, markdown } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import TxItem from '../components/TxItem.svelte';
   import DailyBars from '../components/DailyBars.svelte';
+  import CategoryBars from '../components/CategoryBars.svelte';
 
   let periodKey = $state(app.period?.key ?? '');
   let d = $state<Dashboard | null>(null);
@@ -53,16 +54,29 @@
   function submit(e: Event) {
     e.preventDefault();
     const t = text.trim();
-    if (!t) return go('/ai');
-    go('/ai', { q: t });
+    if (!t) return ui.desktop ? setDock(true) : go('/ai');
+    text = '';
+    askAssistant(t, (q) => go('/ai', { q }));
   }
 
   function pickFiles(e: Event) {
     const files = Array.from((e.currentTarget as HTMLInputElement).files ?? []);
     if (!files.length) return;
     ui.pendingScan = files;
-    go('/ai');
+    if (ui.desktop) setDock(true);
+    else go('/ai');
   }
+
+  // kategori pengeluaran teratas (kartu khusus layar lebar)
+  const topCats = $derived(
+    (d?.by_category ?? [])
+      .filter((c) => c.kind === 'expense')
+      .slice(0, 6)
+      .map((c) => {
+        const x = cat(c.category_id);
+        return { key: String(c.category_id ?? 0), icon: x?.icon ?? '📌', label: x?.name ?? 'Tanpa kategori', total: c.total, count: c.count };
+      }),
+  );
 
   function payBill(b: Budget) {
     const c = cat(b.category_id);
@@ -94,7 +108,8 @@
   }
 </script>
 
-<div class="page stack">
+<div class="page wide">
+<div class="dash stack">
   <header class="row between head">
     <div class="grow">
       <div class="small muted">{greeting()}{app.settings.owner_name ? `, ${app.settings.owner_name}` : ''} 👋</div>
@@ -107,7 +122,13 @@
         <button class="icon-btn sm" onclick={() => d && (periodKey = d.period.next)} aria-label="Periode berikutnya"><Icon name="chevron-right" size={18} /></button>
       </div>
     </div>
-    <button class="icon-btn filled" onclick={() => go('/settings')} aria-label="Pengaturan"><Icon name="settings" /></button>
+    <button class="icon-btn filled mob-only" onclick={() => go('/settings')} aria-label="Pengaturan"><Icon name="settings" /></button>
+    <div class="quick desk-only">
+      <button class="btn sm" onclick={() => openTx({ preset: { type: 'expense' } })}><Icon name="arrow-out" size={16} /> Pengeluaran</button>
+      <button class="btn sm" onclick={() => openTx({ preset: { type: 'income' } })}><Icon name="arrow-in" size={16} /> Pemasukan</button>
+      <button class="btn sm" onclick={() => openTx({ preset: { type: 'transfer' } })}><Icon name="transfer" size={16} /> Transfer</button>
+      <button class="btn sm" onclick={() => fileInput?.click()}><Icon name="camera" size={16} /> Scan mutasi</button>
+    </div>
   </header>
 
   <!-- Bilah AI -->
@@ -131,7 +152,7 @@
     <div class="card skeleton" style="height:90px"></div>
   {:else if d}
     <!-- Kartu utama -->
-    <section class="card hero" class:dim={loading}>
+    <section class="card hero m-half l4" class:dim={loading}>
       {#if hasBudget && d.is_current}
         <div class="small muted">Jatah aman per hari</div>
         <div class="big num">{rp(d.daily_allowance)}</div>
@@ -159,7 +180,7 @@
     </section>
 
     <!-- KPI -->
-    <section class="kpis">
+    <section class="kpis m-half l8">
       <div class="card kpi">
         <div class="tiny muted">Pemasukan</div>
         <div class="v num good">{rpc(d.income)}</div>
@@ -177,10 +198,16 @@
         <div class="v num" class:bad={d.net < 0}>{rpc(d.net)}</div>
         {#if d.plan_expense}<div class="tiny muted">budget {pct(d.budget_spent, d.plan_expense)}%</div>{/if}
       </div>
+      <button class="card kpi desk-only" onclick={() => go('/accounts')}>
+        <div class="tiny muted">Total saldo</div>
+        <div class="v num" class:bad={d.total_balance < 0}>{rpc(d.total_balance)}</div>
+        <div class="tiny muted">{accounts.length} akun{d.debt_remaining > 0 ? ` · utang ${rpc(d.debt_remaining)}` : ''}</div>
+      </button>
     </section>
 
+    <div class="sidecol">
     {#if d.income_by_source?.length}
-      <section class="card">
+      <section class="card m-half">
         <div class="card-title">Pemasukan per sumber</div>
         <div class="stack top">
           {#each d.income_by_source as s (s.source_id ?? 0)}
@@ -196,7 +223,7 @@
     {/if}
 
     {#if outlook && (outlook.pending_count > 0 || outlook.debt_remaining > 0)}
-      <section class="card">
+      <section class="card m-half">
         <div class="card-title">Ke depan <button onclick={() => go('/pending')}>Detail</button></div>
         <div class="stack fwd">
           {#if outlook.pending_count > 0}
@@ -211,8 +238,10 @@
       </section>
     {/if}
 
+    </div>
+
     {#if d.alerts.length}
-      <section class="stack alerts">
+      <section class="stack alerts o-alerts">
         {#each d.alerts as a, i (i)}
           <div class="alert {a.level}"><span>{a.icon}</span><span class="grow small">{a.text}</span></div>
         {/each}
@@ -220,7 +249,7 @@
     {/if}
 
     {#if bills.length}
-      <section class="card">
+      <section class="card m-half l4 o-bills">
         <div class="card-title">Tagihan periode ini <span class="tiny">{rp(d.bills_paid)} / {rp(d.bills_total)}</span></div>
         <div class="bills">
           {#each bills as b (b.id)}
@@ -245,7 +274,7 @@
     {/if}
 
     {#if topBudgets.length}
-      <section class="card">
+      <section class="card m-half l4 o-bud">
         <div class="card-title">Budget fleksibel <button onclick={() => go('/budget', { period: periodKey })}>Semua</button></div>
         <div class="stack">
           {#each topBudgets as b (b.id)}
@@ -266,7 +295,14 @@
       </section>
     {/if}
 
-    <section>
+    {#if topCats.length}
+      <section class="card desk-only m-half l4 o-cats">
+        <div class="card-title">Pengeluaran per kategori <button onclick={() => go('/reports', { period: periodKey })}>Laporan</button></div>
+        <CategoryBars items={topCats} total={d.expense} onpick={(k) => go('/tx', { period: periodKey, category: k === '0' ? undefined : k })} />
+      </section>
+    {/if}
+
+    <section class="l4 o-accs">
       <div class="section-label row between"><span>Akun</span><button class="link small" onclick={() => go('/accounts')}>Kelola</button></div>
       <div class="accs">
         <div class="acc total">
@@ -283,13 +319,13 @@
     </section>
 
     {#if d.daily.length}
-      <section class="card">
+      <section class="card l8 o-daily">
         <div class="card-title">Pengeluaran harian</div>
-        <DailyBars daily={d.daily} today={d.today} allowance={d.is_current ? d.daily_allowance : 0} />
+        <DailyBars daily={d.daily} today={d.today} allowance={d.is_current ? d.daily_allowance : 0} height={ui.desktop ? 170 : 120} />
       </section>
     {/if}
 
-    <section>
+    <section class="l8 o-recent">
       <div class="section-label row between"><span>Transaksi terakhir</span><button class="link small" onclick={() => go('/tx')}>Semua</button></div>
       {#if d.recent.length}
         <div class="list">
@@ -306,7 +342,7 @@
     </section>
 
     {#if app.ai.enabled}
-      <section class="card">
+      <section class="card l8 o-insight">
         <div class="card-title">
           <span class="row" style="gap:6px"><Icon name="brain" size={16} /> Analisis AI</span>
           <button onclick={genInsight} disabled={insightBusy}>{insight ? 'Perbarui' : 'Buat'}</button>
@@ -323,8 +359,13 @@
     {/if}
   {/if}
 </div>
+</div>
 
 <style>
+  .quick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  button.kpi { text-align: left; }
+
+  .sidecol { display: contents; }
   .fwd { gap: 10px; }
   .fwd > button { width: 100%; text-align: left; }
   .ic { width: 22px; text-align: center; flex: none; }
@@ -363,4 +404,39 @@
   .acc { flex: none; min-width: 128px; max-width: 170px; text-align: left; background: var(--surface); border-radius: 14px; padding: 12px; box-shadow: var(--shadow); }
   .acc.total { background: var(--accent); color: #fff; }
   .acc.total .tiny { opacity: 0.85; }
+  /* ---- tata letak dasbor mengikuti lebar area konten (container query) ---- */
+  @container page (min-width: 640px) {
+    .dash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; grid-auto-flow: dense; }
+    .dash > :global(*) { grid-column: 1 / -1; min-width: 0; }
+    .dash .m-half { grid-column: span 1; }
+    .dash > .hero, .dash > .kpis { align-self: stretch; }
+    .kpis { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .kpi { padding: 16px; display: flex; flex-direction: column; justify-content: center; }
+    .kpi .v { font-size: 22px; margin: 4px 0; }
+    .hero { justify-content: center; }
+    .accs { flex-wrap: wrap; margin: 0; padding: 0; overflow: visible; }
+    .acc { flex: 1 1 150px; max-width: none; }
+    .section-label { margin-top: 0; }
+    .o-alerts { order: -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .ptitle { white-space: nowrap; }
+    .head { align-items: center; flex-wrap: wrap; row-gap: 10px; }
+    .head > .grow { flex: 0 0 auto; }
+    .quick { margin-left: auto; }
+    .head { order: -3; }
+    .aibar { order: -2; }
+  }
+  @container page (min-width: 960px) {
+    .dash { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+    .dash > .l4 { grid-column: span 4; }
+    .dash > .l8 { grid-column: span 8; }
+    .kpis { grid-template-columns: repeat(4, 1fr); }
+    .hero .big { font-size: 44px; }
+    .head { order: 0; } .aibar { order: 1; } .o-alerts { order: 2; }
+    .hero { order: 3; } .kpis { order: 4; }
+    .o-daily { order: 5; } .o-accs { order: 6; }
+    .o-cats { order: 7; } .o-bills { order: 8; } .o-bud { order: 9; }
+    .o-recent { order: 10; }
+    .dash > .sidecol { display: flex; flex-direction: column; gap: 16px; grid-column: span 4; order: 11; }
+    .o-insight { order: 13; }
+  }
 </style>

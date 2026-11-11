@@ -52,7 +52,52 @@ export const ui = $state({
   txEditor: null as null | { tx?: Transaction; preset?: Partial<Transaction> },
   /** screenshot yang dipilih dari Beranda, diproses di halaman Asisten */
   pendingScan: null as File[] | null,
+  /** layar lebar (≥1024px): sidebar, panel Asisten, palet perintah */
+  desktop: false,
+  /** panel Asisten di sisi kanan (desktop) */
+  dock: false,
+  /** kalimat dari Beranda/palet yang harus dikirim panel Asisten */
+  ask: null as string | null,
+  palette: false,
+  help: false,
 });
+
+// --- mode desktop ---
+const mqDesktop = window.matchMedia('(min-width: 1024px)');
+function readDock(): boolean {
+  try {
+    const v = localStorage.getItem('mm_dock');
+    if (v !== null) return v === '1';
+  } catch {
+    /* abaikan */
+  }
+  return window.innerWidth >= 1360;
+}
+function syncDesktop() {
+  ui.desktop = mqDesktop.matches;
+  document.documentElement.classList.toggle('dock-open', ui.desktop && ui.dock);
+}
+ui.dock = readDock();
+syncDesktop();
+mqDesktop.addEventListener('change', syncDesktop);
+
+export function setDock(open: boolean): void {
+  ui.dock = open;
+  try {
+    localStorage.setItem('mm_dock', open ? '1' : '0');
+  } catch {
+    /* abaikan */
+  }
+  syncDesktop();
+}
+
+/** Kirim kalimat ke Asisten: panel kanan di desktop, halaman Asisten di ponsel. */
+export function askAssistant(text: string, navigate: (q: string) => void): void {
+  if (ui.desktop) {
+    if (!ui.dock) setDock(true);
+    ui.ask = text;
+  } else navigate(text);
+}
 
 export async function bootstrap(): Promise<void> {
   try {

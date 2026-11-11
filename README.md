@@ -215,3 +215,12 @@ Di **Pengaturan → AI → Sumber AI** pilih:
 
 Pasang Claude CLI: `npm i -g @anthropic-ai/claude-code`, lalu jalankan `claude` sekali dan ketik `/login`. Lokasi bisa diatur dengan `CLAUDE_PATH` dan model dengan `CLAUDE_MODEL` di `.env`. Halaman yang sama menampilkan apakah Codex dan Claude CLI terdeteksi, dan tombol *Tes koneksi AI* memastikan jalurnya berfungsi.
 - **Tempel gambar**: di Asisten, tekan Ctrl/Cmd+V dengan gambar di clipboard (mis. screenshot mutasi) untuk langsung membacanya, sama seperti memilih lewat tombol kamera.
+
+## Tampilan desktop (layar ≥ 1024px)
+Tampilan ponsel tidak berubah; di layar lebar aplikasi memakai kerangka berbeda:
+- **Sidebar kiri**: semua halaman, pemilih buku Pribadi/Work, tombol *Transaksi baru*, pencarian, dan total saldo.
+- **Panel Asisten di kanan** (Ctrl+J): chat AI selalu tersedia di samping halaman mana pun; kolom "Catat atau tanya" di Beranda mengirim ke panel ini tanpa pindah halaman.
+- **Palet perintah** (Ctrl+K atau `/`): cari transaksi, buka halaman, lompat ke akun/kategori, ganti buku/tema, atau ketik kalimat seperti "makan 25rb" untuk langsung dicatat.
+- **Pintasan keyboard**: `N` transaksi baru, `G` lalu `H/T/B/L/A/U/P/S` pindah halaman, `?` daftar pintasan.
+- **Beranda** berupa dasbor multi-kolom (kartu tambahan: total saldo dan pengeluaran per kategori), **Transaksi** berupa tabel yang bisa diurutkan dengan pilih-banyak (hapus / ubah kategori massal), **Budget** dan **Laporan** multi-kolom. Grafik menanggapi hover. Dialog tampil di tengah layar.
+- Tata letak memakai *container query*, jadi mengikuti lebar area konten (tetap rapi saat panel Asisten terbuka).

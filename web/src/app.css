@@ -288,3 +288,49 @@ select.input {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* =====================================================================
+   DESKTOP (≥1024px): sidebar kiri, konten lebar, panel Asisten di kanan.
+   Tampilan ponsel di atas tidak berubah.
+   ===================================================================== */
+:root { --side-w: 0px; --dock-w: 0px; }
+@media (max-width: 1023.98px) { .desk-only { display: none !important; } }
+@media (min-width: 1024px) {
+  :root { --side-w: 248px; --tabbar-h: 0px; --radius: 16px; }
+  .mob-only { display: none !important; }
+  body { padding-left: var(--side-w); padding-right: var(--dock-w); transition: padding-right 0.22s ease; }
+  .page { max-width: 880px; padding: 28px 36px 56px; }
+  .page.wide { max-width: 1360px; }
+  .page-head h1, .page > h1.title { font-size: 30px; }
+  .back { display: none; } /* navigasi ada di sidebar */
+  .page-head:has(> .back:first-child) { justify-content: flex-end; margin-bottom: -44px; position: relative; z-index: 1; pointer-events: none; }
+  .page-head:has(> .back:first-child) > * { pointer-events: auto; }
+  .fab { right: calc(var(--dock-w) + 32px); bottom: 32px; }
+
+  /* interaksi mouse */
+  button.list-item:hover, a.list-item:hover { background: var(--surface-2); }
+  .btn:hover { filter: brightness(0.96); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .icon-btn:hover { background: var(--surface-2); }
+  .chip:hover { border-color: var(--line-strong); }
+  .seg button:not(.on):hover { color: var(--text); }
+  .card-title a:hover, .card-title button:hover, .link:hover { text-decoration: underline; }
+  .card.hover:hover { box-shadow: 0 2px 6px rgba(11,11,11,0.06), 0 10px 28px rgba(11,11,11,0.09); transform: translateY(-1px); }
+  .card.hover { transition: box-shadow 0.18s, transform 0.18s; }
+  .chips:not(.nowrap) { flex-wrap: wrap; overflow: visible; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--line-strong); }
+  kbd {
+    font: 600 11px/1 var(--font); padding: 3px 5px; border-radius: 5px; background: var(--surface-2);
+    border: 1px solid var(--line); color: var(--text-2); white-space: nowrap;
+  }
+}
+@media (min-width: 1280px) {
+  html.dock-open { --dock-w: 392px; }
+}
+@media (min-width: 1024px) {
+  /* halaman menjadi wadah ukur, agar tata letak mengikuti lebar area konten
+     (menyempit saat panel Asisten terbuka), bukan lebar layar */
+  .page { container: page / inline-size; }
+}
