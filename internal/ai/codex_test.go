@@ -104,9 +104,9 @@ func TestClaudeCLIErrors(t *testing.T) {
 	if _, err := s.Ask(t.Context(), nil, "halo", "ai_text"); err == nil || !strings.Contains(err.Error(), "kuota Claude") {
 		t.Fatalf("kuota: %v", err)
 	}
-	// screenshot tidak dikirim ke Claude CLI
-	s = New(Config{ClaudePath: fakeClaudeCLI(t, "", "{}")}, st)
-	if _, err := s.runClaude(t.Context(), "x", codexTextSchema(), []Image{{Data: []byte("x"), MediaType: "image/png"}}); err == nil {
-		t.Fatal("gambar harus ditolak untuk claude")
+	// screenshot diterima Claude CLI lewat berkas sementara (dibaca dengan alat Read)
+	s = New(Config{ClaudePath: fakeClaudeCLI(t, "", `{"text":"ok"}`)}, st)
+	if raw, err := s.runClaude(t.Context(), "x", codexTextSchema(), []Image{{Data: []byte("x"), MediaType: "image/png"}}); err != nil || !strings.Contains(string(raw), "ok") {
+		t.Fatalf("gambar via claude: %s %v", raw, err)
 	}
 }

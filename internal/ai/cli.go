@@ -137,12 +137,9 @@ func (s *Service) runCLI(ctx context.Context, prompt string, schema map[string]a
 	return nil, ErrDisabled
 }
 
-// runClaude menjalankan `claude -p` sekali jalan. Claude CLI tidak menerima
-// gambar lewat argumen, jadi screenshot ditolak dan pemanggil memakai OCR.
+// runClaude menjalankan `claude -p` sekali jalan. Gambar disimpan ke folder
+// sementara dan dibaca lewat alat Read (satu-satunya alat yang diizinkan).
 func (s *Service) runClaude(ctx context.Context, prompt string, schema map[string]any, imgs []Image) ([]byte, error) {
-	if len(imgs) > 0 {
-		return nil, errors.New("Claude CLI belum bisa membaca gambar; pilih Codex CLI untuk screenshot")
-	}
 	dir, err := os.MkdirTemp("", "mymoney-claude-")
 	if err != nil {
 		return nil, err
@@ -151,8 +148,27 @@ func (s *Service) runClaude(ctx context.Context, prompt string, schema map[strin
 
 	sb, _ := json.Marshal(schema)
 	full := prompt + "\n\nBalas HANYA dengan satu objek JSON valid yang sesuai skema berikut, tanpa teks lain dan tanpa pagar kode.\nSkema: " + string(sb)
-	args := []string{"-p", "--output-format", "text",
-		"--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Read", "Glob", "Grep"}
+	args := []string{"-p", "--output-format", "text"}
+	if len(imgs) > 0 {
+		exts := map[string]string{"image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+		var list strings.Builder
+		for i, img := range imgs {
+			ext := exts[img.MediaType]
+			if ext == "" {
+				ext = ".jpg"
+			}
+			p := filepath.Join(dir, fmt.Sprintf("gambar%d%s", i+1, ext))
+			if err := os.WriteFile(p, img.Data, 0o600); err != nil {
+				return nil, err
+			}
+			fmt.Fprintf(&list, "- %s\n", p)
+		}
+		full = prompt + "\n\nGambar yang harus dibaca (buka SETIAP berkas dengan alat Read, lalu ekstrak datanya; jangan membaca berkas lain):\n" + list.String() +
+			"\nBalas HANYA dengan satu objek JSON valid yang sesuai skema berikut, tanpa teks lain dan tanpa pagar kode.\nSkema: " + string(sb)
+		args = append(args, "--allowedTools", "Read")
+	} else {
+		args = append(args, "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Read", "Glob", "Grep")
+	}
 	if s.cfg.ClaudeModel != "" {
 		args = append(args, "--model", s.cfg.ClaudeModel)
 	}
