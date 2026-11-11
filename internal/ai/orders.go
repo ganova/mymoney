@@ -84,7 +84,7 @@ func (s *Service) ExtractOrders(ctx context.Context, images []Image) (*OrderResu
 	today := s.store.Today()
 	hdr := fmt.Sprintf("Hari ini: %s (%s).", today.Format("2006-01-02"), period.MonthName(today.Month()))
 	var raw []byte
-	if s.apiReady() {
+	if s.useAPI(ctx) {
 		var content []anthropic.BetaContentBlockParamUnion
 		for i, img := range images {
 			content = append(content, anthropic.NewBetaTextBlock(fmt.Sprintf("Gambar %d:", i+1)))
@@ -105,7 +105,7 @@ func (s *Service) ExtractOrders(ctx context.Context, images []Image) (*OrderResu
 		raw = []byte(textOf(msg))
 	} else {
 		var err error
-		raw, err = s.runCodex(ctx, ordersPrompt+"\n\nJangan membaca atau menjalankan perintah apa pun. Gambar terlampir adalah sumber datanya.\n\n"+hdr+"\nEkstrak semua pesanannya sekarang.", ordersSchema(), images)
+		raw, err = s.runCLI(ctx, ordersPrompt+"\n\nJangan membaca atau menjalankan perintah apa pun. Gambar terlampir adalah sumber datanya.\n\n"+hdr+"\nEkstrak semua pesanannya sekarang.", ordersSchema(), images)
 		if err != nil {
 			return nil, err
 		}

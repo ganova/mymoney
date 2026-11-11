@@ -43,25 +43,35 @@ func main() {
 	}
 	defer st.Close()
 
-	apiKey, codexPath := cfg.AnthropicKey, ""
+	// Kedua CLI dicari sekali di awal; pilihan yang dipakai diatur di Pengaturan → AI.
+	apiKey := cfg.AnthropicKey
+	codexPath := ai.FindCodex(cfg.CodexPath)
+	claudePath := ai.FindClaude(cfg.ClaudePath)
 	switch cfg.AIProvider {
 	case "offline":
-		apiKey = ""
+		apiKey, codexPath, claudePath = "", "", ""
 	case "codex":
-		apiKey, codexPath = "", ai.FindCodex(cfg.CodexPath)
+		apiKey, claudePath = "", ""
 		if codexPath == "" {
 			log.Printf("AI_PROVIDER=codex tetapi Codex CLI tidak ditemukan (npm i -g @openai/codex); memakai mode offline")
 		}
-	case "auto":
-		if apiKey == "" {
-			codexPath = ai.FindCodex(cfg.CodexPath)
+	case "claude":
+		apiKey, codexPath = "", ""
+		if claudePath == "" {
+			log.Printf("AI_PROVIDER=claude tetapi Claude CLI tidak ditemukan (npm i -g @anthropic-ai/claude-code); memakai mode offline")
 		}
+	case "api":
+		codexPath, claudePath = "", ""
 	}
 	if codexPath != "" {
-		log.Printf("AI memakai Codex CLI: %s", codexPath)
+		log.Printf("Codex CLI terdeteksi: %s", codexPath)
+	}
+	if claudePath != "" {
+		log.Printf("Claude CLI terdeteksi: %s", claudePath)
 	}
 	aiSvc := ai.New(ai.Config{
 		CodexPath: codexPath, CodexModel: cfg.CodexModel,
+		ClaudePath: claudePath, ClaudeModel: cfg.ClaudeModel,
 		APIKey: apiKey, BaseURL: cfg.AnthropicBaseURL, Model: cfg.AIModel,
 		Effort: cfg.AIEffort, VisionEffort: cfg.AIVisionEffort, Fallbacks: cfg.AIFallbacks,
 	}, st)

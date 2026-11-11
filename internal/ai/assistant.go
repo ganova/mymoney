@@ -105,7 +105,7 @@ func (s *Service) systemBlocks(c *Context, extra string) []anthropic.BetaTextBlo
 
 // Ask menjalankan satu giliran asisten: mencatat transaksi atau menjawab pertanyaan.
 func (s *Service) Ask(ctx context.Context, history []HistoryItem, text, source string) (*AssistantResult, error) {
-	if !s.apiReady() {
+	if !s.useAPI(ctx) {
 		return s.codexAsk(ctx, history, text, source)
 	}
 	c, err := LoadContext(ctx, s.store)

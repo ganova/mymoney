@@ -75,7 +75,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 		"debts":          debts,
 		"period":         cur.Info(),
 		"today":          s.store.Today().Format("2006-01-02"),
-		"ai":             map[string]any{"enabled": s.aiOn(ctx), "available": s.ai.Enabled(), "mode": st.AIMode, "model": s.ai.Model(), "ocr": ocr.Available()},
+		"ai":             map[string]any{"enabled": s.aiOn(ctx), "available": s.ai.Enabled(), "mode": st.AIMode, "cli": st.AICLI, "status": s.ai.Status(ctx), "model": s.ai.Model(), "ocr": ocr.Available()},
 		"auth_required":  s.authRequired(),
 		"version":        Version,
 	})

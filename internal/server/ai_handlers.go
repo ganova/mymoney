@@ -669,7 +669,7 @@ func strPtr(s string) *string { return &s }
 // handleAITest menguji koneksi AI (Codex CLI atau API) agar masalahnya terlihat jelas.
 func (s *Server) handleAITest(w http.ResponseWriter, r *http.Request) {
 	if !s.ai.Enabled() {
-		writeJSON(w, 200, map[string]any{"ok": false, "message": "AI belum tersedia: pasang Codex CLI (npm i -g @openai/codex lalu codex login) atau isi ANTHROPIC_API_KEY, lalu jalankan ulang MyMoney."})
+		writeJSON(w, 200, map[string]any{"ok": false, "message": "AI belum tersedia: pasang Codex CLI (npm i -g @openai/codex, lalu codex login) atau Claude CLI (npm i -g @anthropic-ai/claude-code, lalu claude dan /login), atau isi ANTHROPIC_API_KEY. Lalu jalankan ulang MyMoney."})
 		return
 	}
 	start := time.Now()

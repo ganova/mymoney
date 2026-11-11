@@ -67,6 +67,8 @@ type Config struct {
 	AIProvider       string // auto | api | codex | offline
 	CodexPath        string
 	CodexModel       string
+	ClaudePath       string
+	ClaudeModel      string
 }
 
 func env(key, def string) string {
@@ -100,5 +102,7 @@ func Load() Config {
 		AIProvider:       strings.ToLower(env("AI_PROVIDER", "auto")),
 		CodexPath:        os.Getenv("CODEX_PATH"),
 		CodexModel:       os.Getenv("CODEX_MODEL"),
+		ClaudePath:       os.Getenv("CLAUDE_PATH"),
+		ClaudeModel:      os.Getenv("CLAUDE_MODEL"),
 	}
 }

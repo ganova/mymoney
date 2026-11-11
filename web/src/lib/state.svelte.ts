@@ -1,4 +1,4 @@
-import type { Account, Category, Debt, IncomeSource, Ledger, PeriodInfo, Settings, Transaction } from './types';
+import type { AIStatus, Account, Category, Debt, IncomeSource, Ledger, PeriodInfo, Settings, Transaction } from './types';
 import { api, setLedger } from './api';
 
 interface Bootstrap {
@@ -8,7 +8,7 @@ interface Bootstrap {
   debts: Debt[];
   period: PeriodInfo;
   today: string;
-  ai: { enabled: boolean; available: boolean; mode: 'ai' | 'offline'; model: string; ocr: boolean };
+  ai: { enabled: boolean; available: boolean; mode: 'ai' | 'offline'; cli: string; status: AIStatus; model: string; ocr: boolean };
   ledgers: Ledger[];
   ledger_id: number;
   income_sources: IncomeSource[];
@@ -27,13 +27,13 @@ export const app = $state({
   /** akun di buku lain, hanya untuk tujuan transfer antar buku */
   otherAccounts: [] as Account[],
   error: '',
-  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, ai_mode: 'ai', owner_name: '' } as Settings,
+  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, ai_mode: 'ai', ai_cli: 'auto', owner_name: '' } as Settings,
   accounts: [] as Account[],
   categories: [] as Category[],
   debts: [] as Debt[],
   period: null as PeriodInfo | null,
   today: '',
-  ai: { enabled: false, available: false, mode: 'ai' as 'ai' | 'offline', model: '', ocr: false },
+  ai: { enabled: false, available: false, mode: 'ai' as 'ai' | 'offline', cli: 'auto', status: { active: '', api_key: false, codex_found: false, claude_found: false } as AIStatus, model: '', ocr: false },
   version: '',
   /** naik setiap kali data berubah, agar halaman memuat ulang */
   dataVersion: 0,

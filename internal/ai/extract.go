@@ -99,7 +99,7 @@ func (s *Service) Extract(ctx context.Context, in ExtractInput) (*ExtractResult,
 			p = q
 		}
 	}
-	if !s.apiReady() {
+	if !s.useAPI(ctx) {
 		return s.codexExtract(ctx, c, in, p)
 	}
 	instr := s.extractInstr(c, in, p)
@@ -156,7 +156,7 @@ func (s *Service) codexExtract(ctx context.Context, c *Context, in ExtractInput,
 	if len(in.Images) == 0 && strings.TrimSpace(in.Text) == "" {
 		return nil, fmt.Errorf("tidak ada gambar, PDF, atau teks untuk dibaca")
 	}
-	raw, err := s.runCodex(ctx, s.codexExtractPrompt(c, in, p), extractSchema(), in.Images)
+	raw, err := s.runCLI(ctx, s.codexExtractPrompt(c, in, p), extractSchema(), in.Images)
 	if err != nil {
 		return nil, err
 	}

@@ -58,6 +58,19 @@
     }
   }
 
+  async function setAICLI(cli: 'auto' | 'api' | 'codex' | 'claude') {
+    if (s.ai_cli === cli) return;
+    s.ai_cli = cli;
+    aiTest = null;
+    try {
+      app.settings = await api.put<Settings>('/settings', { ...s, ai_cli: cli });
+      await loadBootstrap();
+      toast('Sumber AI diubah');
+    } catch (e) {
+      toastError(e);
+    }
+  }
+
   async function testAI() {
     aiTesting = true;
     aiTest = null;
@@ -178,6 +191,31 @@
         {/if}
       </span>
     </div>
+    {#if s.ai_mode === 'ai'}
+      <div class="field">
+        <span>Sumber AI</span>
+        <div class="seg" role="tablist">
+          <button class:on={s.ai_cli === 'auto'} onclick={() => setAICLI('auto')}>Otomatis</button>
+          {#if app.ai.status.codex_found}<button class:on={s.ai_cli === 'codex'} onclick={() => setAICLI('codex')}>Codex</button>{/if}
+          {#if app.ai.status.claude_found}<button class:on={s.ai_cli === 'claude'} onclick={() => setAICLI('claude')}>Claude CLI</button>{/if}
+          {#if app.ai.status.api_key}<button class:on={s.ai_cli === 'api'} onclick={() => setAICLI('api')}>API key</button>{/if}
+        </div>
+        <span class="tiny muted">
+          {#if s.ai_cli === 'auto'}Otomatis: API key bila ada, lalu Codex, lalu Claude CLI — yang terpasang di PC ini.
+          {:else if s.ai_cli === 'codex'}Memakai Codex CLI (langganan ChatGPT). Kuota Claude tidak terpakai.
+          {:else if s.ai_cli === 'claude'}Memakai Claude CLI (langganan Claude Pro/Max) di PC ini. Screenshot dibaca dengan OCR, bukan AI.
+          {:else}Memakai API key Claude (berbayar per pemakaian).{/if}
+        </span>
+        <div class="tiny">
+          <span class:good={app.ai.status.codex_found} class:bad={!app.ai.status.codex_found}>{app.ai.status.codex_found ? '● Codex terpasang' : '○ Codex belum terpasang'}</span>
+          &nbsp;·&nbsp;
+          <span class:good={app.ai.status.claude_found} class:bad={!app.ai.status.claude_found}>{app.ai.status.claude_found ? '● Claude CLI terpasang' : '○ Claude CLI belum terpasang'}</span>
+        </div>
+        {#if !app.ai.status.codex_found && !app.ai.status.claude_found && !app.ai.status.api_key}
+          <p class="tiny text-2">Pasang salah satu: <code>npm i -g @anthropic-ai/claude-code</code> lalu <code>claude</code> dan ketik <code>/login</code>; atau <code>npm i -g @openai/codex</code> lalu <code>codex login</code>. Jalankan ulang MyMoney setelahnya.</p>
+        {/if}
+      </div>
+    {/if}
     <div class="row between">
       <span>Status AI</span>
       {#if !app.ai.available}<span class="badge bad">Belum terpasang</span>

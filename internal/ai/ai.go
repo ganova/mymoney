@@ -29,6 +29,8 @@ type Config struct {
 	Fallbacks    bool   // aktifkan server-side fallback saat ditolak classifier
 	CodexPath    string // lokasi Codex CLI; dipakai bila APIKey kosong
 	CodexModel   string // model Codex (kosong = bawaan Codex)
+	ClaudePath   string // lokasi Claude Code CLI
+	ClaudeModel  string // model Claude CLI (kosong = bawaan)
 }
 
 // Service adalah gerbang ke Claude API.
@@ -65,17 +67,14 @@ func New(cfg Config, st *store.Store) *Service {
 }
 
 // Enabled melaporkan apakah API key tersedia.
-func (s *Service) Enabled() bool { return s.apiReady() || s.codexReady() }
+func (s *Service) Enabled() bool { return s.apiReady() || s.codexReady() || s.claudeReady() }
 
 func (s *Service) apiReady() bool { return s != nil && s.cfg.APIKey != "" }
 
 // Model mengembalikan nama model yang dipakai.
 func (s *Service) Model() string {
-	if !s.apiReady() && s.codexReady() {
-		if s.cfg.CodexModel != "" {
-			return "Codex CLI · " + s.cfg.CodexModel
-		}
-		return "Codex CLI"
+	if name := s.CLIName(context.Background()); name != "" && name != "API Claude" {
+		return name
 	}
 	return s.cfg.Model
 }

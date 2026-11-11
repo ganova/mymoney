@@ -95,7 +95,7 @@ func (s *Service) SuggestBudget(ctx context.Context, text string) (*BudgetSugges
 	}
 	userMsg := "Rencana budget saya:\n<data>\n" + strings.TrimSpace(text) + "\n</data>"
 	var out BudgetSuggestion
-	if s.apiReady() {
+	if s.useAPI(ctx) {
 		p := s.baseParams(s.cfg.VisionEffort, 32000)
 		p.System = s.systemBlocks(c, budgetPrompt)
 		p.Messages = []anthropic.BetaMessageParam{userText(userMsg)}
@@ -108,7 +108,7 @@ func (s *Service) SuggestBudget(ctx context.Context, text string) (*BudgetSugges
 			return nil, err
 		}
 	} else {
-		raw, err := s.runCodex(ctx, budgetPrompt+"\n\n# Data pengguna\n"+c.Describe()+"\n\n"+userMsg, budgetSchema(), nil)
+		raw, err := s.runCLI(ctx, budgetPrompt+"\n\n# Data pengguna\n"+c.Describe()+"\n\n"+userMsg, budgetSchema(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -180,8 +180,8 @@ func (s *Service) Insight(ctx context.Context, key string) (string, error) {
 	for _, h := range r.History {
 		fmt.Fprintf(&b, "- %s | %s | %s\n", h.Label, money.Format(h.Income), money.Format(h.Expense))
 	}
-	if !s.apiReady() {
-		raw, err := s.runCodex(ctx, insightPrompt+"\n\nJawab dalam Markdown biasa, bukan JSON. Jangan menjalankan perintah apa pun.\n\n"+b.String(), codexTextSchema(), nil)
+	if !s.useAPI(ctx) {
+		raw, err := s.runCLI(ctx, insightPrompt+"\n\nJawab dalam Markdown biasa, bukan JSON. Jangan menjalankan perintah apa pun.\n\n"+b.String(), codexTextSchema(), nil)
 		if err != nil {
 			return "", err
 		}

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -19,34 +18,8 @@ import (
 	"github.com/ganova/mymoney/internal/store"
 )
 
-// FindCodex mencari program Codex CLI: CODEX_PATH, PATH, atau folder npm global di Windows.
-func FindCodex(explicit string) string {
-	if explicit != "" {
-		if p, err := exec.LookPath(explicit); err == nil {
-			return p
-		}
-		return ""
-	}
-	// Di Windows, codex dari npm (-g) lebih mudah diperbarui daripada codex.exe
-	// bawaan aplikasi desktop yang bisa tertinggal versinya, jadi dicek lebih dulu.
-	if runtime.GOOS == "windows" {
-		for _, base := range []string{os.Getenv("APPDATA"), filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")} {
-			if base == "" {
-				continue
-			}
-			for _, n := range []string{"codex.cmd", "codex.exe"} {
-				p := filepath.Join(base, "npm", n)
-				if _, err := os.Stat(p); err == nil {
-					return p
-				}
-			}
-		}
-	}
-	if p, err := exec.LookPath("codex"); err == nil {
-		return p
-	}
-	return ""
-}
+// FindCodex mencari program Codex CLI.
+func FindCodex(explicit string) string { return findNPMCLI("codex", explicit) }
 
 // friendlyCodexError mengubah kegagalan `codex exec` (stderr mentah berisi JSON
 // dan jejak panjang) menjadi satu kalimat yang bisa ditindaklanjuti pengguna.
@@ -87,11 +60,11 @@ func friendlyCodexError(ctx context.Context, err error, stderr string) error {
 }
 
 // Ping menguji koneksi AI dengan permintaan terkecil; mengembalikan nama jalur
-// yang dipakai ("Codex CLI" atau "API Claude").
+// yang dipakai (API Claude, Codex CLI, atau Claude CLI).
 func (s *Service) Ping(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	if s.apiReady() {
+	if s.useAPI(ctx) {
 		p := s.baseParams("low", 64)
 		p.Messages = []anthropic.BetaMessageParam{userText("Balas satu kata: OK")}
 		if _, err := s.send(ctx, "ping", p); err != nil {
@@ -99,15 +72,12 @@ func (s *Service) Ping(ctx context.Context) (string, error) {
 		}
 		return "API Claude", nil
 	}
-	if !s.codexReady() {
-		return "", ErrDisabled
-	}
 	schema := map[string]any{"type": "object", "additionalProperties": false, "required": []string{"ok"},
 		"properties": map[string]any{"ok": map[string]any{"type": "boolean"}}}
-	if _, err := s.runCodex(ctx, `Balas JSON {"ok": true}. Jangan menjalankan perintah apa pun.`, schema, nil); err != nil {
+	if _, err := s.runCLI(ctx, `Balas JSON {"ok": true}. Jangan menjalankan perintah apa pun.`, schema, nil); err != nil {
 		return "", err
 	}
-	return "Codex CLI", nil
+	return s.CLIName(ctx), nil
 }
 
 func (s *Service) codexReady() bool { return s != nil && s.cfg.CodexPath != "" }
@@ -205,7 +175,7 @@ func (s *Service) codexAsk(ctx context.Context, history []HistoryItem, text, sou
 		}
 	}
 	b.WriteString("\n# Pesan pengguna sekarang\n" + text + "\n")
-	raw, err := s.runCodex(ctx, b.String(), codexAskSchema(), nil)
+	raw, err := s.runCLI(ctx, b.String(), codexAskSchema(), nil)
 	if err != nil {
 		return nil, err
 	}

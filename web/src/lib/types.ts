@@ -6,6 +6,8 @@ export interface Settings {
   ai_autosave: boolean;
   /** ai = pakai AI (Codex/API) bila tersedia; offline = selalu tanpa AI */
   ai_mode: 'ai' | 'offline';
+  /** sumber AI saat mode Pakai AI */
+  ai_cli: 'auto' | 'api' | 'codex' | 'claude';
   owner_name: string;
 }
 
@@ -22,6 +24,13 @@ export interface Account {
   ledger_id: number;
   balance: number;
   tx_count: number;
+}
+
+export interface AIStatus {
+  active: string;
+  api_key: boolean;
+  codex_found: boolean;
+  claude_found: boolean;
 }
 
 export interface Ledger {

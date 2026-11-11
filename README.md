@@ -205,3 +205,12 @@ Setiap kali ingin memasang/memperbarui: `powershell -ExecutionPolicy Bypass -Fil
 
 ## Mode AI & cadangan tanpa AI
 Di **Pengaturan → AI** pilih cara mencatat bawaan: *Pakai AI* (Codex CLI atau API Claude) atau *Tanpa AI* (kata kunci + kebiasaan + OCR, tidak memakai kuota). Dalam mode *Pakai AI*, bila AI gagal (Codex belum login/perlu diperbarui, kuota habis, tidak ada internet, terlalu lama) aplikasi otomatis memakai mode tanpa AI dan menjelaskan penyebabnya, bukan menampilkan error. Tombol *Tes koneksi AI* menunjukkan masalahnya langsung. Pertanyaan ("berapa sisa budget makan?") tidak dijadikan transaksi oleh mode tanpa AI.
+
+## Sumber AI: Codex CLI atau Claude CLI di PC ini
+Di **Pengaturan → AI → Sumber AI** pilih:
+- **Otomatis** (bawaan): API key bila ada, lalu Codex, lalu Claude CLI yang terpasang.
+- **Codex**: memakai `codex` (langganan ChatGPT). Bisa membaca screenshot.
+- **Claude CLI**: memakai `claude` (langganan Claude Pro/Max), tanpa API key. Untuk catat kalimat, susun budget, dan analisis. Screenshot dibaca dengan OCR, karena Claude CLI tidak menerima gambar lewat argumen.
+- **API key**: hanya muncul bila `ANTHROPIC_API_KEY` terisi.
+
+Pasang Claude CLI: `npm i -g @anthropic-ai/claude-code`, lalu jalankan `claude` sekali dan ketik `/login`. Lokasi bisa diatur dengan `CLAUDE_PATH` dan model dengan `CLAUDE_MODEL` di `.env`. Halaman yang sama menampilkan apakah Codex dan Claude CLI terdeteksi, dan tombol *Tes koneksi AI* memastikan jalurnya berfungsi.
