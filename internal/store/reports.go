@@ -243,7 +243,7 @@ func (s *Store) Dashboard(ctx context.Context, p period.Period) (*Dashboard, err
 		budgeted[b.CategoryID] = true
 		d.PlanExpense += b.Amount
 		d.BudgetSpent += b.Actual
-		if b.DueDay > 0 {
+		if b.Mandatory {
 			d.BillsTotal += b.Amount
 			d.BillsPaid += min(b.Actual, b.Amount)
 		} else {
@@ -282,7 +282,7 @@ func (s *Store) alerts(d *Dashboard, p period.Period, catName map[int64]string) 
 			continue
 		}
 		name := catName[b.CategoryID]
-		if b.DueDay > 0 {
+		if b.Mandatory && b.DueDay > 0 {
 			if b.Actual >= b.Amount || !d.IsCurrent {
 				continue
 			}

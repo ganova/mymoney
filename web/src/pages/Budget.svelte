@@ -14,7 +14,7 @@
   let loading = $state(true);
 
   // editor baris
-  let edit = $state<null | { id?: number; category_id: number; amount: number; due_day: number; note: string; isBill: boolean }>(null);
+  let edit = $state<null | { id?: number; category_id: number; amount: number; due_day: number; note: string; mandatory: boolean }>(null);
   let saving = $state(false);
 
   // AI
@@ -42,9 +42,14 @@
 
   const expenseLines = $derived((d?.budgets ?? []).filter((b) => b.kind === 'expense'));
   const incomeLines = $derived((d?.budgets ?? []).filter((b) => b.kind === 'income'));
+  const mandatoryLines = $derived(expenseLines.filter((b) => b.mandatory));
+  const mandatoryTotal = $derived({
+    plan: mandatoryLines.reduce((s, b) => s + b.amount, 0),
+    actual: mandatoryLines.reduce((s, b) => s + b.actual, 0),
+  });
   const groups = $derived.by(() => {
     const m = new Map<string, Budget[]>();
-    for (const b of expenseLines) {
+    for (const b of expenseLines.filter((x) => !x.mandatory)) {
       const g = cat(b.category_id)?.group || 'Lain-lain';
       if (!m.has(g)) m.set(g, []);
       m.get(g)!.push(b);
@@ -65,8 +70,8 @@
   const freeCats = $derived(activeCategories().filter((c) => !(d?.budgets ?? []).some((b) => b.category_id === c.id)));
 
   function openEdit(b?: Budget, categoryId?: number, amount?: number) {
-    if (b) edit = { id: b.id, category_id: b.category_id, amount: b.amount, due_day: b.due_day, note: b.note, isBill: b.due_day > 0 };
-    else edit = { category_id: categoryId ?? 0, amount: amount ?? 0, due_day: 0, note: '', isBill: false };
+    if (b) edit = { id: b.id, category_id: b.category_id, amount: b.amount, due_day: b.due_day, note: b.note, mandatory: b.mandatory };
+    else edit = { category_id: categoryId ?? 0, amount: amount ?? 0, due_day: 0, note: '', mandatory: false };
   }
 
   async function saveLine() {
@@ -76,7 +81,7 @@
     try {
       await api.put('/budgets', {
         period: d.period.key, category_id: edit.category_id, amount: edit.amount,
-        due_day: edit.isBill ? edit.due_day || app.settings.period_start_day : 0, note: edit.note,
+        mandatory: edit.mandatory, due_day: edit.mandatory ? edit.due_day : 0, note: edit.note,
       });
       edit = null;
       await changed();
@@ -120,7 +125,7 @@
       // "internet jadi tagihan bulanan" tidak menghapus baris lainnya
       const current = (d?.budgets ?? []).map((b) => {
         const c = cat(b.category_id);
-        return `- ${c?.name ?? 'Kategori'} | ${b.kind === 'income' ? 'pemasukan' : 'pengeluaran'} | ${b.amount}${b.due_day ? ` | tagihan tgl ${b.due_day}` : ' | fleksibel'}`;
+        return `- ${c?.name ?? 'Kategori'} | ${b.kind === 'income' ? 'pemasukan' : 'pengeluaran'} | ${b.amount} | ${b.mandatory ? 'wajib' : 'fleksibel'}${b.due_day ? ` | tgl ${b.due_day}` : ''}`;
       });
       const text = current.length
         ? `Budget saat ini (kembalikan SEMUA baris ini di hasil, termasuk yang tidak diubah):\n${current.join('\n')}\n\nPerubahan yang diminta:\n${aiText}`
@@ -243,15 +248,45 @@
       </div>
     {/if}
 
+    {#if mandatoryLines.length}
+      <div class="grp">
+      <div class="section-label row between"><span>Wajib tiap bulan</span><span class="num">{rp(mandatoryTotal.actual)} / {rp(mandatoryTotal.plan)}</span></div>
+      <div class="list">
+        {#each mandatoryLines as b (b.id)}
+          {@const c = cat(b.category_id)}
+          {@const p = pct(b.actual, b.amount)}
+          {@const over = b.actual > b.amount}
+          {@const paid = b.actual >= b.amount && b.amount > 0}
+          <button class="list-item" onclick={() => openEdit(b)}>
+            <div class="bubble">{c?.icon}</div>
+            <div class="grow">
+              <div class="row name">
+                <span class="ellipsis">{c?.name}</span>
+                <span class="badge accent">wajib</span>
+                {#if b.due_day}<span class="badge {paid ? 'good' : ''}">{paid ? '✓ lunas' : `tgl ${b.due_day}`}</span>{/if}
+              </div>
+              <div class="meter" class:over class:done={paid} style="margin-top:6px"><i style:width="{Math.min(p, 100)}%"></i></div>
+              <div class="small row between" style="margin-top:4px">
+                <span class="num"><strong>{rp(b.actual)}</strong><span class="muted"> / {rp(b.amount)}</span></span>
+                <span class="tiny" class:bad={over} class:muted={!over}>{over ? `Lewat ${rp(b.actual - b.amount)}` : `Sisa ${rp(b.amount - b.actual)}`}</span>
+              </div>
+              {#if b.note}<div class="tiny muted ellipsis">{b.note}</div>{/if}
+            </div>
+          </button>
+        {/each}
+      </div>
+      </div>
+    {/if}
+
     {#each groups as g (g.name)}
       <div class="grp">
-      <div class="section-label row between"><span>{g.name}</span><span class="num">{rp(g.actual)} / {rp(g.plan)}</span></div>
+      <div class="section-label row between"><span>Fleksibel · {g.name}</span><span class="num">{rp(g.actual)} / {rp(g.plan)}</span></div>
       <div class="list">
         {#each g.items as b (b.id)}
           {@const c = cat(b.category_id)}
           {@const p = pct(b.actual, b.amount)}
           {@const over = b.actual > b.amount}
-          {@const paid = b.due_day > 0 && b.actual >= b.amount && b.amount > 0}
+          {@const paid = false}
           <button class="list-item" onclick={() => openEdit(b)}>
             <div class="bubble">{c?.icon}</div>
             <div class="grow">
@@ -299,7 +334,7 @@
         <button class="btn grow" onclick={() => openEdit()}><Icon name="plus" size={18} /> Tambah baris</button>
         <button class="btn grow" onclick={copyPrev}><Icon name="copy" size={18} /> Salin periode lalu</button>
       </div>
-      <p class="tiny muted center">Budget otomatis disalin ke periode baru setiap tanggal {app.settings.period_start_day}. Baris dengan tanggal jatuh tempo muncul sebagai tagihan di Beranda.</p>
+      <p class="tiny muted center">Budget otomatis disalin ke periode baru setiap tanggal {app.settings.period_start_day}. Baris wajib muncul sebagai tagihan di Beranda; baris fleksibel tidak punya jadwal tetap.</p>
     {/if}
   {:else}
     <div class="card skeleton" style="height:160px"></div>
@@ -329,14 +364,14 @@
       <div class="card"><AmountField bind:value={edit.amount} autofocus={!edit.amount} /></div>
       {#if cat(edit.category_id)?.kind !== 'income'}
         <label class="row between card tight">
-          <span><strong>Tagihan tetap</strong><br /><span class="small muted">Punya tanggal bayar, mis. cicilan rumah tgl 28</span></span>
-          <span class="toggle"><input type="checkbox" bind:checked={edit.isBill} /><span></span></span>
+          <span><strong>Wajib tiap bulan</strong><br /><span class="small muted">Pasti keluar tiap bulan walau nominalnya berubah (cicilan, sekolah, internet). Matikan untuk pengeluaran fleksibel.</span></span>
+          <span class="toggle"><input type="checkbox" bind:checked={edit.mandatory} /><span></span></span>
         </label>
-        {#if edit.isBill}
+        {#if edit.mandatory}
           <label class="field">
-            <span>Tanggal jatuh tempo</span>
+            <span>Tanggal bayar (opsional)</span>
             <select class="input" bind:value={edit.due_day}>
-              <option value={0}>Pilih tanggal…</option>
+              <option value={0}>Tidak ada tanggal tetap</option>
               {#each Array.from({ length: 31 }, (_, i) => i + 1) as n (n)}<option value={n}>Tanggal {n}</option>{/each}
             </select>
           </label>
@@ -380,7 +415,7 @@
             <div class="bubble sm">{lineIcon(l)}</div>
             <div class="grow">
               <div class="ellipsis">{lineName(l)} {#if !l.category_id}<span class="badge accent">baru</span>{/if}</div>
-              <div class="tiny muted ellipsis">{l.label}{l.due_day ? ` · tgl ${l.due_day}` : ''}{l.note ? ` · ${l.note}` : ''}</div>
+              <div class="tiny muted ellipsis">{l.label}{l.mandatory ? ' · wajib' : ' · fleksibel'}{l.due_day ? ` · tgl ${l.due_day}` : ''}{l.note ? ` · ${l.note}` : ''}</div>
             </div>
             <div class="num bold small">{rp(l.amount)}</div>
           </label>

@@ -138,6 +138,8 @@ export interface Budget {
   note: string;
   actual: number;
   kind: 'expense' | 'income';
+  /** wajib = pasti keluar tiap bulan (nominal boleh berubah); false = fleksibel */
+  mandatory: boolean;
   due_date?: string;
 }
 
@@ -234,6 +236,7 @@ export interface ExtractResult {
 
 export interface BudgetLine {
   label: string;
+  mandatory: boolean;
   category_id: number | null;
   new_category: { name: string; group: string; icon: string; kind: 'expense' | 'income' } | null;
   amount: number;

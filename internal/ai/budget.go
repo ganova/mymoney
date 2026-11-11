@@ -17,7 +17,8 @@ Aturan:
 - Petakan setiap item ke kategori yang SUDAH ADA bila cocok (isi category_id, new_category null). Bila beberapa item cocok ke kategori yang sama (mis. "Uang sehari-hari minggu 1..4"), gabungkan nominalnya menjadi satu baris dan sebutkan rinciannya di note.
 - Bila tidak ada kategori yang cocok, usulkan kategori baru lewat new_category (name singkat, group salah satu dari: "Tagihan Bulanan", "Sehari-hari", "Belanja Bulanan", "Cicilan & Utang", "Lain-lain", atau "Pemasukan" untuk pemasukan; icon satu emoji; kind expense/income) dan category_id null.
 - Pemasukan rutin (gaji, dsb.) juga dijadikan baris budget dengan kategori pemasukan.
-- due_day: tanggal jatuh tempo bila item adalah tagihan tetap dengan tanggal bayar (mis. "tgl 28", kolom "Tgl Act" berisi 28). 0 untuk pengeluaran fleksibel.
+- mandatory: true untuk item yang PASTI keluar tiap bulan walau nominalnya berubah (cicilan, sekolah, iuran, internet, listrik, pengasuh, dsb.). false untuk item fleksibel yang angka dan kemunculannya belum pasti (jajan, bensin, belanja harian, hiburan). Pemasukan rutin (gaji) dianggap wajib.
+- due_day: tanggal bayar tetap (mis. "tgl 28") hanya untuk item wajib yang punya tanggal; 0 bila tidak ada. Item fleksibel selalu due_day 0.
 - Abaikan item bernilai 0 atau baris kosong/"-", kecuali pengguna jelas ingin mencatatnya.
 - amount: bilangan bulat rupiah.
 - Jika pesan memuat blok "Budget saat ini", itu adalah keadaan sekarang: kembalikan SEMUA barisnya di lines (sertakan yang tidak diubah dengan nilai aslinya), lalu terapkan perubahan dari bagian "Perubahan yang diminta". Jangan hanya mengembalikan baris yang diubah.
@@ -41,13 +42,14 @@ func budgetSchema() map[string]any {
 	}
 	line := map[string]any{
 		"type": "object", "additionalProperties": false,
-		"required": []string{"label", "category_id", "new_category", "amount", "due_day", "note"},
+		"required": []string{"label", "category_id", "new_category", "amount", "mandatory", "due_day", "note"},
 		"properties": map[string]any{
 			"label":        map[string]any{"type": "string", "description": "Nama item seperti ditulis pengguna"},
 			"category_id":  nullableInt("ID kategori yang sudah ada"),
 			"new_category": newCat,
 			"amount":       map[string]any{"type": "integer"},
-			"due_day":      map[string]any{"type": "integer", "description": "1-31 untuk tagihan bertanggal, 0 bila fleksibel"},
+			"mandatory":    map[string]any{"type": "boolean", "description": "true = wajib: pasti keluar tiap bulan walau nominalnya berubah. false = fleksibel: angka dan kemunculannya tidak pasti"},
+			"due_day":      map[string]any{"type": "integer", "description": "1-31 hanya bila wajib dan ada tanggal bayar tetap; 0 bila tidak ada"},
 			"note":         map[string]any{"type": "string"},
 		},
 	}
@@ -75,6 +77,7 @@ type BudgetLine struct {
 	CategoryID  *int64       `json:"category_id"`
 	NewCategory *NewCategory `json:"new_category"`
 	Amount      int64        `json:"amount"`
+	Mandatory   bool         `json:"mandatory"`
 	DueDay      int          `json:"due_day"`
 	Note        string       `json:"note"`
 }
@@ -131,6 +134,9 @@ func (s *Service) SuggestBudget(ctx context.Context, text string) (*BudgetSugges
 		}
 		if l.DueDay < 0 || l.DueDay > 31 {
 			l.DueDay = 0
+		}
+		if l.DueDay > 0 {
+			l.Mandatory = true
 		}
 		if l.Amount < 0 {
 			l.Amount = -l.Amount

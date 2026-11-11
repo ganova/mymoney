@@ -39,10 +39,10 @@
     return () => ctrl.abort();
   });
 
-  const bills = $derived((d?.budgets ?? []).filter((b) => b.kind === 'expense' && b.due_day > 0).sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '')));
+  const bills = $derived((d?.budgets ?? []).filter((b) => b.kind === 'expense' && b.mandatory).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9')));
   const topBudgets = $derived(
     (d?.budgets ?? [])
-      .filter((b) => b.kind === 'expense' && b.due_day === 0 && b.amount > 0)
+      .filter((b) => b.kind === 'expense' && !b.mandatory && b.amount > 0)
       .sort((a, b) => b.actual / b.amount - a.actual / a.amount)
       .slice(0, 4),
   );

@@ -524,9 +524,10 @@ func (s *Server) handleApplyBudget(w http.ResponseWriter, r *http.Request) {
 				Icon  string `json:"icon"`
 				Kind  string `json:"kind"`
 			} `json:"new_category"`
-			Amount int64  `json:"amount"`
-			DueDay int    `json:"due_day"`
-			Note   string `json:"note"`
+			Amount    int64  `json:"amount"`
+			Mandatory bool   `json:"mandatory"`
+			DueDay    int    `json:"due_day"`
+			Note      string `json:"note"`
 		} `json:"lines"`
 	}
 	if err := decode(r, &in); err != nil {
@@ -546,9 +547,10 @@ func (s *Server) handleApplyBudget(w http.ResponseWriter, r *http.Request) {
 	}
 	// gabungkan baris yang menuju kategori sama, lalu simpan
 	type agg struct {
-		amount int64
-		due    int
-		notes  []string
+		amount    int64
+		due       int
+		mandatory bool
+		notes     []string
 	}
 	order := []int64{}
 	byCat := map[int64]*agg{}
@@ -575,6 +577,7 @@ func (s *Server) handleApplyBudget(w http.ResponseWriter, r *http.Request) {
 		}
 		a.amount += l.Amount
 		a.due = max(a.due, l.DueDay)
+		a.mandatory = a.mandatory || l.Mandatory || l.DueDay > 0
 		if n := strings.TrimSpace(l.Note); n != "" {
 			a.notes = append(a.notes, n)
 		}
@@ -582,7 +585,7 @@ func (s *Server) handleApplyBudget(w http.ResponseWriter, r *http.Request) {
 	saved := 0
 	for _, catID := range order {
 		a := byCat[catID]
-		if _, err := s.store.UpsertBudget(ctx, store.Budget{Period: p.Key, CategoryID: catID, Amount: a.amount, DueDay: a.due, Note: strings.Join(a.notes, "; ")}); err != nil {
+		if _, err := s.store.UpsertBudget(ctx, store.Budget{Period: p.Key, CategoryID: catID, Amount: a.amount, DueDay: a.due, Mandatory: a.mandatory, Note: strings.Join(a.notes, "; ")}); err != nil {
 			fail(w, err)
 			return
 		}

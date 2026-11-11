@@ -17,8 +17,11 @@ type Budget struct {
 	CategoryID int64  `json:"category_id"`
 	Amount     int64  `json:"amount"`
 	DueDay     int    `json:"due_day"`
-	AccountID  *int64 `json:"account_id"`
-	Note       string `json:"note"`
+	// Mandatory: budget wajib (pasti keluar tiap bulan, nominal boleh berubah).
+	// Fleksibel = Mandatory false: angka dan kemunculannya tidak pasti.
+	Mandatory bool   `json:"mandatory"`
+	AccountID *int64 `json:"account_id"`
+	Note      string `json:"note"`
 	// Dihitung:
 	Actual  int64  `json:"actual"`
 	Kind    string `json:"kind"`
@@ -28,7 +31,7 @@ type Budget struct {
 // ListBudgets mengembalikan baris budget periode beserta realisasinya.
 func (s *Store) ListBudgets(ctx context.Context, p period.Period) ([]Budget, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT b.id, b.period, b.category_id, b.amount, b.due_day, b.account_id, b.note, c.kind,
+SELECT b.id, b.period, b.category_id, b.amount, b.due_day, b.mandatory, b.account_id, b.note, c.kind,
   COALESCE((SELECT SUM(t.amount) FROM transactions t
             WHERE t.ledger_id = b.ledger_id AND t.category_id = b.category_id AND t.type = c.kind AND t.date BETWEEN ? AND ?), 0)
 FROM budgets b JOIN categories c ON c.id = b.category_id
@@ -42,7 +45,7 @@ ORDER BY c.kind DESC, c.sort, c.id`, p.StartStr(), p.EndStr(), p.Key, LedgerID(c
 	for rows.Next() {
 		var b Budget
 		var acc sql.NullInt64
-		if err := rows.Scan(&b.ID, &b.Period, &b.CategoryID, &b.Amount, &b.DueDay, &acc, &b.Note, &b.Kind, &b.Actual); err != nil {
+		if err := rows.Scan(&b.ID, &b.Period, &b.CategoryID, &b.Amount, &b.DueDay, &b.Mandatory, &acc, &b.Note, &b.Kind, &b.Actual); err != nil {
 			return nil, err
 		}
 		b.AccountID = ptr(acc)
@@ -103,10 +106,10 @@ func (s *Store) EnsureBudget(ctx context.Context, p period.Period) (bool, error)
 // CopyBudget menyalin baris budget dari satu periode ke periode lain.
 // Bila overwrite=false, kategori yang sudah ada di tujuan tidak diubah.
 func (s *Store) CopyBudget(ctx context.Context, from, to string, overwrite bool) (int64, error) {
-	q := `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, account_id, note)
-		SELECT ledger_id, ?, category_id, amount, due_day, account_id, note FROM budgets WHERE period = ? AND ledger_id = ?`
+	q := `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, mandatory, account_id, note)
+		SELECT ledger_id, ?, category_id, amount, due_day, mandatory, account_id, note FROM budgets WHERE period = ? AND ledger_id = ?`
 	if overwrite {
-		q += ` ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note`
+		q += ` ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, mandatory = excluded.mandatory, account_id = excluded.account_id, note = excluded.note`
 	} else {
 		q += ` ON CONFLICT(ledger_id, period, category_id) DO NOTHING`
 	}
@@ -131,9 +134,13 @@ func (s *Store) UpsertBudget(ctx context.Context, b Budget) (Budget, error) {
 	if b.DueDay < 0 || b.DueDay > 31 {
 		return b, invalid("tanggal jatuh tempo harus 1–31")
 	}
-	err := s.DB.QueryRowContext(ctx, `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, account_id, note) VALUES (?,?,?,?,?,?,?)
-		ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, account_id = excluded.account_id, note = excluded.note
-		RETURNING id`, LedgerID(ctx), b.Period, b.CategoryID, b.Amount, b.DueDay, nullInt(b.AccountID), b.Note).Scan(&b.ID)
+	// tanggal jatuh tempo hanya bermakna untuk budget wajib
+	if b.DueDay > 0 {
+		b.Mandatory = true
+	}
+	err := s.DB.QueryRowContext(ctx, `INSERT INTO budgets (ledger_id, period, category_id, amount, due_day, mandatory, account_id, note) VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(ledger_id, period, category_id) DO UPDATE SET amount = excluded.amount, due_day = excluded.due_day, mandatory = excluded.mandatory, account_id = excluded.account_id, note = excluded.note
+		RETURNING id`, LedgerID(ctx), b.Period, b.CategoryID, b.Amount, b.DueDay, b.Mandatory, nullInt(b.AccountID), b.Note).Scan(&b.ID)
 	return b, err
 }
 

@@ -384,3 +384,34 @@ func TestReceivablesAndOutlook(t *testing.T) {
 		t.Fatal("receivable bocor ke Pribadi")
 	}
 }
+
+func TestMandatoryBudgetIsIndependentOfDueDate(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	p, _ := s.CurrentPeriod(ctx)
+	jajan := idOf(t, s, "Makan & Minum")
+	cicil := idOf(t, s, "Cicilan Rumah")
+	// fleksibel dan wajib tanpa tanggal
+	if _, err := s.UpsertBudget(ctx, Budget{Period: p.Key, CategoryID: jajan, Amount: 500_000}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpsertBudget(ctx, Budget{Period: p.Key, CategoryID: cicil, Amount: 4_650_000, Mandatory: true}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.Dashboard(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.BillsTotal != 4_650_000 || d.FlexPlan != 500_000 {
+		t.Fatalf("wajib/fleksibel: bills=%d flex=%d", d.BillsTotal, d.FlexPlan)
+	}
+	for _, b := range d.Budgets {
+		if b.CategoryID == cicil && (!b.Mandatory || b.DueDate != "") {
+			t.Fatalf("wajib tanpa tanggal salah: %+v", b)
+		}
+	}
+	// tanggal bayar otomatis menjadikan wajib
+	if b, _ := s.UpsertBudget(ctx, Budget{Period: p.Key, CategoryID: jajan, Amount: 500_000, DueDay: 5}); !b.Mandatory {
+		t.Fatal("due_day > 0 harus menjadikan wajib")
+	}
+}

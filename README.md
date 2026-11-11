@@ -224,3 +224,10 @@ Tampilan ponsel tidak berubah; di layar lebar aplikasi memakai kerangka berbeda:
 - **Pintasan keyboard**: `N` transaksi baru, `G` lalu `H/T/B/L/A/U/P/S` pindah halaman, `?` daftar pintasan.
 - **Beranda** berupa dasbor multi-kolom (kartu tambahan: total saldo dan pengeluaran per kategori), **Transaksi** berupa tabel yang bisa diurutkan dengan pilih-banyak (hapus / ubah kategori massal), **Budget** dan **Laporan** multi-kolom. Grafik menanggapi hover. Dialog tampil di tengah layar.
 - Tata letak memakai *container query*, jadi mengikuti lebar area konten (tetap rapi saat panel Asisten terbuka).
+
+## Budget wajib & fleksibel
+Setiap baris pengeluaran budget kini punya jenis:
+- **Wajib tiap bulan**: pasti keluar tiap bulan walau nominalnya berubah (cicilan, sekolah, internet, listrik). Muncul di bagian atas Budget dan sebagai tagihan di Beranda. Tanggal bayar tetap bersifat opsional.
+- **Fleksibel**: angka dan kemunculannya belum pasti (jajan, bensin, belanja harian). Dihitung sebagai jatah harian.
+
+Tanggal jatuh tempo tidak lagi menentukan jenis; baris dengan tanggal otomatis menjadi wajib. Saat menyusun budget dengan AI, jenis setiap baris ikut diusulkan dan bisa diubah sebelum disimpan.

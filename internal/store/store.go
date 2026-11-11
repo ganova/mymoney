@@ -256,6 +256,10 @@ CREATE INDEX idx_recv_ledger ON receivables(ledger_id, status);
 `,
 	// v4: nomor pesanan platform pada pendapatan tertunda (agar scan ulang tidak menggandakan)
 	`ALTER TABLE receivables ADD COLUMN ref TEXT NOT NULL DEFAULT '';`,
+	// v5: jenis budget "wajib" (pasti keluar tiap bulan, nominal boleh berubah),
+	// terpisah dari tanggal jatuh tempo. Baris lama yang punya tanggal dianggap wajib.
+	`ALTER TABLE budgets ADD COLUMN mandatory INTEGER NOT NULL DEFAULT 0;
+UPDATE budgets SET mandatory = 1 WHERE due_day > 0;`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {
