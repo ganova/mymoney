@@ -115,6 +115,18 @@
     if (i >= 0) messages[i] = { ...messages[i], ...patch, pending: false };
   }
 
+  // Tempel (Ctrl/Cmd+V) gambar dari clipboard langsung ke Asisten, seperti screenshot.
+  function onPaste(e: ClipboardEvent) {
+    const images = Array.from(e.clipboardData?.items ?? [])
+      .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+      .map((it) => it.getAsFile())
+      .filter((f): f is File => !!f);
+    if (!images.length) return; // teks biasa tetap ditempel seperti biasa
+    e.preventDefault();
+    const named = images.map((f, i) => new File([f], `tempel-${Date.now()}-${i + 1}.png`, { type: f.type || 'image/png' }));
+    scanFiles = named.slice(0, 10);
+  }
+
   function pickFiles(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
@@ -253,6 +265,7 @@
     enterkeyhint="send"
     oninput={autoGrow}
     onkeydown={onKey}
+    onpaste={onPaste}
     aria-label="Pesan"
   ></textarea>
   <button type="submit" class="send" disabled={busy || !text.trim()} aria-label="Kirim">

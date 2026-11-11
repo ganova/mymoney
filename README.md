@@ -214,3 +214,4 @@ Di **Pengaturan → AI → Sumber AI** pilih:
 - **API key**: hanya muncul bila `ANTHROPIC_API_KEY` terisi.
 
 Pasang Claude CLI: `npm i -g @anthropic-ai/claude-code`, lalu jalankan `claude` sekali dan ketik `/login`. Lokasi bisa diatur dengan `CLAUDE_PATH` dan model dengan `CLAUDE_MODEL` di `.env`. Halaman yang sama menampilkan apakah Codex dan Claude CLI terdeteksi, dan tombol *Tes koneksi AI* memastikan jalurnya berfungsi.
+- **Tempel gambar**: di Asisten, tekan Ctrl/Cmd+V dengan gambar di clipboard (mis. screenshot mutasi) untuk langsung membacanya, sama seperti memilih lewat tombol kamera.
