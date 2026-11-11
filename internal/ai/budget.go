@@ -20,6 +20,7 @@ Aturan:
 - due_day: tanggal jatuh tempo bila item adalah tagihan tetap dengan tanggal bayar (mis. "tgl 28", kolom "Tgl Act" berisi 28). 0 untuk pengeluaran fleksibel.
 - Abaikan item bernilai 0 atau baris kosong/"-", kecuali pengguna jelas ingin mencatatnya.
 - amount: bilangan bulat rupiah.
+- Jika pesan memuat blok "Budget saat ini", itu adalah keadaan sekarang: kembalikan SEMUA barisnya di lines (sertakan yang tidak diubah dengan nilai aslinya), lalu terapkan perubahan dari bagian "Perubahan yang diminta". Jangan hanya mengembalikan baris yang diubah.
 - summary: 1-2 kalimat ringkasan dalam bahasa Indonesia (total pemasukan, total pengeluaran, selisih).`
 
 func budgetSchema() map[string]any {

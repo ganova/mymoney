@@ -24,7 +24,8 @@
   let aiBusy = $state(false);
   let aiLines = $state<(BudgetLine & { on: boolean })[]>([]);
   let aiSummary = $state('');
-  let aiReplace = $state(true);
+  // bawaan: gabung dengan budget yang ada; "ganti semua" harus dipilih sendiri
+  let aiReplace = $state(false);
 
   $effect(() => {
     app.dataVersion;
@@ -115,8 +116,17 @@
     if (!aiText.trim() && !aiFile) return toast('Tempel daftar budget atau pilih file', { kind: 'error' });
     aiBusy = true;
     try {
+      // budget yang sudah ada dikirim sebagai konteks, supaya perintah seperti
+      // "internet jadi tagihan bulanan" tidak menghapus baris lainnya
+      const current = (d?.budgets ?? []).map((b) => {
+        const c = cat(b.category_id);
+        return `- ${c?.name ?? 'Kategori'} | ${b.kind === 'income' ? 'pemasukan' : 'pengeluaran'} | ${b.amount}${b.due_day ? ` | tagihan tgl ${b.due_day}` : ' | fleksibel'}`;
+      });
+      const text = current.length
+        ? `Budget saat ini (kembalikan SEMUA baris ini di hasil, termasuk yang tidak diubah):\n${current.join('\n')}\n\nPerubahan yang diminta:\n${aiText}`
+        : aiText;
       const fd = new FormData();
-      fd.append('text', aiText);
+      fd.append('text', text);
       if (aiFile) fd.append('file', aiFile);
       const r = await api.post<{ lines: BudgetLine[]; summary: string }>('/ai/budget', fd);
       aiLines = r.lines.map((l) => ({ ...l, on: l.amount > 0 }));
