@@ -22,6 +22,7 @@ Aplikasi keuangan pribadi (bahasa Indonesia) untuk satu pengguna, dipakai dari S
 - Jatah mingguan (`internal/store/weekly.go`, `Dashboard.Weekly`): pool = pendapatan − budget wajib, 4 minggu (8+8+8+sisa hari), terpakai = pengeluaran non-wajib; pengaturan per buku (`weekly_allowance_<ledger>`, bawaan aktif hanya di Utama). `DailyAllowance` mengikuti sisa minggu berjalan saat aktif.
 - Jatah mingguan membawa sisa/kekurangan minggu yang sudah selesai ke minggu berikutnya (`WeekPlan.Base` + `Carry` = `Allowance`).
 - Backup (`internal/store/backup.go`, `server/backup_loop.go`): `VACUUM INTO` ke `BACKUP_DIR` (bawaan `data/backups`), dijadwalkan tiap `BACKUP_EVERY_HOURS`, disimpan `BACKUP_KEEP` versi.
+- Folder backup: setting DB `backup_dir` → `BACKUP_DIR` → `data/backups` (`Server.backupFolder`, jatuh ke bawaan bila tak bisa diakses). Laporan bulanan xlsx periode sebelumnya per buku dibuat oleh `ensureMonthlyReports` (`server/report_xlsx.go`) dari loop yang sama.
 - Budget per (periode, kategori); `due_day > 0` = tagihan. `EnsureBudget` menyalin budget terakhir ke periode berjalan bila kosong.
 - Aturan (`rules`) dipelajari otomatis saat transaksi disimpan/dikoreksi dan dimasukkan ke prompt AI serta parser offline.
 - Draf AI (`ai.Draft`) selalu melewati `Context.Sanitize` agar ID akun/kategori valid; pengguna mengonfirmasi sebelum disimpan (kecuali Shortcut/autosave).

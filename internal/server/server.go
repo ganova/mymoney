@@ -132,6 +132,8 @@ func (s *Server) routes() {
 	p("GET /api/backup", s.handleBackup)
 	p("GET /api/backup/status", s.handleBackupStatus)
 	p("POST /api/backup/now", s.handleBackupNow)
+	p("PUT /api/backup/dir", s.handleSetBackupDir)
+	p("POST /api/backup/report", s.handleMonthlyReportNow)
 
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "endpoint tidak ditemukan") })
 	m.Handle("/", s.staticHandler())

@@ -20,6 +20,7 @@ import (
 	"github.com/ganova/mymoney/internal/config"
 	"github.com/ganova/mymoney/internal/ocr"
 	"github.com/ganova/mymoney/internal/store"
+	"github.com/xuri/excelize/v2"
 )
 
 type client struct {
@@ -41,7 +42,7 @@ func newTestServerAI(t *testing.T, password string, aiCfg ai.Config) (*client, *
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	cfg := config.Config{Password: password, Location: loc}
+	cfg := config.Config{Password: password, Location: loc, DataDir: t.TempDir(), BackupKeep: 5}
 	static := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>MyMoney</title>")}, "assets/app.js": {Data: []byte("console.log(1)")}}
 	srv, err := New(cfg, st, ai.New(aiCfg, st), static)
 	if err != nil {
@@ -435,5 +436,93 @@ func TestAIModeSetting(t *testing.T) {
 	c.json("POST", "/api/ai/ask", map[string]string{"text": "makan siang 25rb"}, &out)
 	if out.Mode != "offline" || strings.Contains(out.Reply, "Dicatat oleh AI") || strings.Contains(out.Reply, "tidak bisa diakses") {
 		t.Fatalf("mode offline: %+v", out)
+	}
+}
+
+func TestMonthlyReportAndBackupDir(t *testing.T) {
+	c, st := newTestServer(t, "")
+	ctx := t.Context()
+	cur, _ := st.CurrentPeriod(ctx)
+	prev := cur.Prev()
+	var boot struct {
+		Accounts   []store.Account  `json:"accounts"`
+		Categories []store.Category `json:"categories"`
+	}
+	c.json("GET", "/api/bootstrap", nil, &boot)
+	cat := func(name string) int64 {
+		for _, x := range boot.Categories {
+			if x.Name == name {
+				return x.ID
+			}
+		}
+		t.Fatalf("kategori %s tidak ada", name)
+		return 0
+	}
+	mk := func(typ string, amt int64, catID int64, date string) {
+		if _, err := st.CreateTransaction(ctx, store.Transaction{Type: typ, Amount: amt, AccountID: boot.Accounts[0].ID, CategoryID: &catID, Date: date, Description: "uji"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("income", 10_000_000, cat("Gaji"), prev.StartStr())
+	mk("expense", 250_000, cat("Makan & Minum"), prev.Start.AddDate(0, 0, 3).Format("2006-01-02"))
+	mk("expense", 99_000, cat("Makan & Minum"), cur.StartStr()) // periode berjalan: tidak masuk laporan
+
+	// pilih folder lewat API
+	dir := filepath.Join(t.TempDir(), "My Drive", "My Money")
+	var status struct {
+		Dir     string   `json:"dir"`
+		Warning string   `json:"warning"`
+		Reports []string `json:"reports"`
+	}
+	if code := c.json("PUT", "/api/backup/dir", map[string]string{"dir": dir}, &status); code != 200 || status.Dir != dir || status.Warning != "" {
+		t.Fatalf("set dir: %d %+v", code, status)
+	}
+	if code, _ := c.do("PUT", "/api/backup/dir", map[string]string{"dir": "relatif/saja"}); code != 400 {
+		t.Fatalf("lokasi relatif harus ditolak: %d", code)
+	}
+
+	// laporan periode lalu: hanya buku yang punya transaksi (Utama)
+	var made struct {
+		Files []string `json:"files"`
+	}
+	if code := c.json("POST", "/api/backup/report", nil, &made); code != 200 || len(made.Files) != 1 {
+		t.Fatalf("laporan: %d %+v", code, made)
+	}
+	want := filepath.Join(dir, "Laporan "+prev.Label+" - Utama.xlsx")
+	if made.Files[0] != want {
+		t.Fatalf("nama berkas: %s, harapan %s", made.Files[0], want)
+	}
+	x, err := excelize.OpenFile(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer x.Close()
+	for _, sh := range []string{"Ringkasan", "Per Kategori", "Harian", "Transaksi"} {
+		if i, _ := x.GetSheetIndex(sh); i < 0 {
+			t.Fatalf("sheet %s tidak ada: %v", sh, x.GetSheetList())
+		}
+	}
+	if v, _ := x.GetCellValue("Ringkasan", "B4", excelize.Options{RawCellValue: true}); v != "10000000" {
+		t.Fatalf("pemasukan di ringkasan: %q", v)
+	}
+	if v, _ := x.GetCellValue("Ringkasan", "B5", excelize.Options{RawCellValue: true}); v != "250000" {
+		t.Fatalf("pengeluaran hanya periode lalu: %q", v)
+	}
+	rows, _ := x.GetRows("Transaksi")
+	if len(rows) != 3 { // header + 2 transaksi periode lalu
+		t.Fatalf("baris transaksi: %d", len(rows))
+	}
+	c.json("GET", "/api/backup/status", nil, &status)
+	if len(status.Reports) != 1 {
+		t.Fatalf("daftar laporan: %+v", status.Reports)
+	}
+
+	// folder pilihan tidak bisa diakses → jatuh ke data/backups dengan peringatan
+	blocker := filepath.Join(t.TempDir(), "berkas")
+	os.WriteFile(blocker, []byte("x"), 0o600)
+	st.SetSetting(ctx, "backup_dir", filepath.Join(blocker, "sub"))
+	c.json("GET", "/api/backup/status", nil, &status)
+	if status.Warning == "" || !strings.HasSuffix(status.Dir, "backups") {
+		t.Fatalf("fallback: %+v", status)
 	}
 }

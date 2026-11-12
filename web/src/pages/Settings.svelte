@@ -15,8 +15,11 @@
   let rules = $state<Rule[]>([]);
   let showRules = $state(false);
   let usage = $state<{ since: string; usage: Usage[] } | null>(null);
-  let backup = $state<{ dir: string; count: number; keep: number; every_hours: number; last?: { name: string; size: number; mod_time: string } } | null>(null);
+  type BackupStatus = { dir: string; warning: string; count: number; keep: number; every_hours: number; reports: string[]; last?: { name: string; size: number; mod_time: string } };
+  let backup = $state<BackupStatus | null>(null);
   let backing = $state(false);
+  let backupDir = $state('');
+  let reporting = $state(false);
   let aiTest = $state<{ ok: boolean; message: string; ms?: number } | null>(null);
   let aiTesting = $state(false);
   let theme = $state(localStorage.getItem('mm_theme') ?? 'auto');
@@ -31,14 +34,37 @@
     api.get<APIToken[]>('/tokens').then((t) => (tokens = t)).catch(() => {});
     api.get<Rule[]>('/rules').then((r) => (rules = r)).catch(() => {});
     api.get<typeof usage>('/ai/usage').then((u) => (usage = u)).catch(() => {});
-    api.get<typeof backup>('/backup/status').then((b) => (backup = b)).catch(() => {});
+    api.get<BackupStatus>('/backup/status').then((b) => { backup = b; backupDir = b.dir; }).catch(() => {});
   });
+
+  async function saveBackupDir() {
+    try {
+      backup = await api.put<BackupStatus>('/backup/dir', { dir: backupDir.trim() });
+      backupDir = backup.dir;
+      toast('Folder backup disimpan');
+    } catch (e) {
+      toastError(e);
+    }
+  }
+
+  async function reportNow() {
+    reporting = true;
+    try {
+      const r = await api.post<{ files: string[] }>('/backup/report');
+      backup = await api.get<BackupStatus>('/backup/status');
+      toast(r.files.length ? `${r.files.length} laporan dibuat` : 'Periode lalu belum punya transaksi');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      reporting = false;
+    }
+  }
 
   async function backupNow() {
     backing = true;
     try {
       await api.post('/backup/now');
-      backup = await api.get<typeof backup>('/backup/status');
+      backup = await api.get<BackupStatus>('/backup/status');
       toast('Backup tersimpan');
     } catch (e) {
       toastError(e);
@@ -265,14 +291,27 @@
   <div class="section-label">Backup</div>
   <div class="card stack">
     {#if backup}
-      <div class="small text-2">Disimpan otomatis tiap {backup.every_hours} jam ke <code>{backup.dir}</code>, {backup.keep} versi terakhir.</div>
+      <div class="field">
+        <span>Folder backup & laporan</span>
+        <div class="row">
+          <input class="input grow" bind:value={backupDir} placeholder="mis. G:\My Drive\My Money" autocomplete="off" spellcheck="false" />
+          <button class="btn sm" onclick={saveBackupDir} disabled={backupDir.trim() === backup.dir}>Simpan</button>
+        </div>
+      </div>
+      {#if backup.warning}<div class="alert warn"><span class="grow small">⚠️ {backup.warning}</span></div>{/if}
+      <div class="small text-2">Database dicadangkan otomatis {backup.every_hours ? `tiap ${backup.every_hours} jam` : '(dimatikan)'}, {backup.keep} versi terakhir disimpan.</div>
       {#if backup.last}
         <div class="row between small"><span class="muted">Terakhir</span><span class="num">{backup.last.name.replace('mymoney-', '').replace('.db', '')}</span></div>
       {:else}
         <div class="small text-2">Belum ada backup.</div>
       {/if}
       <button class="btn block" onclick={backupNow} disabled={backing}>{#if backing}<span class="spinner"></span>{/if} Buat backup sekarang</button>
-      <p class="tiny muted">Tip: isi <code>BACKUP_DIR</code> di .env dengan folder yang ikut tersinkron (mis. Google Drive) agar salinannya aman di luar PC.</p>
+      <hr class="divider" />
+      <div class="small text-2"><strong>Laporan bulanan (Excel)</strong> — setiap periode baru dimulai (tanggal {s.period_start_day}), laporan lengkap periode sebelumnya dibuat otomatis di folder ini, satu berkas per buku.</div>
+      {#each backup.reports as r (r)}
+        <div class="small num">📗 {r}</div>
+      {/each}
+      <button class="btn block" onclick={reportNow} disabled={reporting}>{#if reporting}<span class="spinner"></span>{/if} Buat ulang laporan periode lalu</button>
     {/if}
   </div>
 

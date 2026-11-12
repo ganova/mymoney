@@ -25,6 +25,12 @@ AI_MODEL=claude-haiku-5-5
 "@ | Set-Content -Encoding ASCII $envFile
 }
 
+# backup & laporan bulanan ke Google Drive bila drive-nya ada dan belum diatur
+if (-not (Select-String -Path $envFile -Pattern '^\s*BACKUP_DIR\s*=' -Quiet) -and (Test-Path 'G:\My Drive')) {
+  Add-Content -Path $envFile -Value "`r`nBACKUP_DIR=G:\My Drive\My Money"
+  Write-Host "Backup & laporan bulanan diarahkan ke G:\My Drive\My Money"
+}
+
 # jalan otomatis setiap login (tanpa jendela, tanpa hak admin)
 $startup = [Environment]::GetFolderPath("Startup")
 $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $startup "MyMoney.lnk"))

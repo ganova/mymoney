@@ -241,5 +241,8 @@ Untuk buku Utama (bisa diatur per buku di Pengaturan → Jatah mingguan), uang f
 
 ## Backup otomatis
 - Database disalin otomatis saat aplikasi jalan dan tiap 24 jam (ubah dengan `BACKUP_EVERY_HOURS`; `0` mematikan). Hanya 14 versi terakhir yang disimpan (`BACKUP_KEEP`).
-- Lokasi: `data\backups` di samping program. Untuk menyimpan di luar PC, isi `BACKUP_DIR` di `.env` dengan folder yang tersinkron (mis. Google Drive). Pengaturan → Backup menampilkan lokasi dan backup terakhir, dan tombol untuk membuat backup sekarang.
+- Lokasi diatur di **Pengaturan → Backup → Folder backup & laporan** (atau `BACKUP_DIR` di `.env`; bawaan `data\backups`). `install-windows.ps1` otomatis mengisi `G:\My Drive\My Money` bila Google Drive terpasang dan belum diatur. Bila folder pilihan tidak bisa diakses (mis. Drive belum menyala), backup sementara masuk ke `data\backups` dan Pengaturan menampilkan peringatan.
 - Berkas backup adalah database SQLite biasa: bisa dibuka lagi atau dikembalikan dengan mengganti `mymoney.db` saat aplikasi berhenti.
+
+## Laporan bulanan otomatis (Excel)
+Setiap periode baru dimulai (tanggal mulai periode, bawaan 28), aplikasi membuat laporan lengkap periode **sebelumnya** di folder backup, satu berkas per buku yang punya transaksi: `Laporan Oktober 2026 - Utama.xlsx`. Isinya: Ringkasan (pemasukan, pengeluaran, selisih, budget wajib/fleksibel, pemasukan per sumber, jatah mingguan, per akun, tren 6 periode, saldo akun, utang), Per Kategori, Budget, Harian, Pengeluaran Terbesar, dan seluruh Transaksi. Bila PC mati di tanggal itu, laporan dibuat saat aplikasi berikutnya berjalan. Berkas yang sudah ada tidak ditimpa; tombol *Buat ulang laporan periode lalu* di Pengaturan membuatnya ulang.
