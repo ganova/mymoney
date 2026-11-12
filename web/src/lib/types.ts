@@ -6,6 +6,8 @@ export interface Settings {
   ai_autosave: boolean;
   /** ai = pakai AI (Codex/API) bila tersedia; offline = selalu tanpa AI */
   ai_mode: 'ai' | 'offline';
+  /** jatah fleksibel dibagi per minggu (pengaturan per buku) */
+  weekly_allowance: boolean;
   /** sumber AI saat mode Pakai AI */
   ai_cli: 'auto' | 'api' | 'codex' | 'claude';
   owner_name: string;
@@ -31,6 +33,32 @@ export interface AIStatus {
   api_key: boolean;
   codex_found: boolean;
   claude_found: boolean;
+}
+
+export interface WeekPlan {
+  index: number;
+  start: string;
+  end: string;
+  days: number;
+  allowance: number;
+  spent: number;
+  remaining: number;
+  current: boolean;
+  past: boolean;
+  days_left: number;
+  daily_left: number;
+}
+
+export interface WeeklyPlan {
+  income: number;
+  mandatory: number;
+  pool: number;
+  weeks: WeekPlan[];
+  current: number;
+  spent: number;
+  remaining: number;
+  daily_rate: number;
+  income_is_actual: boolean;
 }
 
 export interface Ledger {
@@ -186,6 +214,7 @@ export interface Dashboard {
   bills_paid: number;
   by_category: CatTotal[];
   income_by_source: SourceTotal[];
+  weekly?: WeeklyPlan | null;
   daily: DayTotal[];
   budgets: Budget[];
   accounts: Account[];

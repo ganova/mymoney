@@ -162,6 +162,10 @@
       </select>
     </label>
     <label class="row between">
+      <span><strong>Jatah mingguan</strong><br /><span class="small muted">Uang fleksibel (pendapatan − budget wajib) dibagi 4 minggu: 3 minggu × 8 hari, minggu ke-4 sisanya. Berlaku per buku.</span></span>
+      <span class="toggle"><input type="checkbox" bind:checked={s.weekly_allowance} /><span></span></span>
+    </label>
+    <label class="row between">
       <span><strong>Simpan otomatis</strong><br /><span class="small muted">Draf AI yang yakin (nominal jelas) langsung tersimpan, tetap bisa diurungkan</span></span>
       <span class="toggle"><input type="checkbox" bind:checked={s.ai_autosave} /><span></span></span>
     </label>

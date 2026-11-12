@@ -27,7 +27,7 @@ export const app = $state({
   /** akun di buku lain, hanya untuk tujuan transfer antar buku */
   otherAccounts: [] as Account[],
   error: '',
-  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, ai_mode: 'ai', ai_cli: 'auto', owner_name: '' } as Settings,
+  settings: { period_start_day: 28, default_account_id: 0, ai_autosave: false, weekly_allowance: true, ai_mode: 'ai', ai_cli: 'auto', owner_name: '' } as Settings,
   accounts: [] as Account[],
   categories: [] as Category[],
   debts: [] as Debt[],

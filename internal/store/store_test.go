@@ -124,6 +124,12 @@ func TestRulesLearning(t *testing.T) {
 func TestBudgetCarryOverAndDashboard(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
+	// jalur jatah harian (mode mingguan dimatikan); jatah mingguan diuji terpisah
+	st, _ := s.GetSettings(ctx)
+	st.WeeklyAllowance = false
+	if err := s.SaveSettings(ctx, st); err != nil {
+		t.Fatal(err)
+	}
 	cur, _ := s.CurrentPeriod(ctx)
 	prev := cur.Prev()
 	bca := idOf(t, s, "BCA")
@@ -413,5 +419,68 @@ func TestMandatoryBudgetIsIndependentOfDueDate(t *testing.T) {
 	// tanggal bayar otomatis menjadikan wajib
 	if b, _ := s.UpsertBudget(ctx, Budget{Period: p.Key, CategoryID: jajan, Amount: 500_000, DueDay: 5}); !b.Mandatory {
 		t.Fatal("due_day > 0 harus menjadikan wajib")
+	}
+}
+
+func TestWeeklyAllowance(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	p, _ := s.CurrentPeriod(ctx)
+	bca := idOf(t, s, "BCA")
+	gaji := idOf(t, s, "Gaji")
+	cicil := idOf(t, s, "Cicilan Rumah")
+	makan := idOf(t, s, "Makan & Minum")
+	mk := func(typ string, amt int64, cat int64, date string) {
+		if _, err := s.CreateTransaction(ctx, Transaction{Type: typ, Amount: amt, AccountID: bca, CategoryID: &cat, Date: date}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	start := p.Start.Format("2006-01-02")
+	mk("income", 10_000_000, gaji, start)
+	mk("expense", 4_000_000, cicil, start) // wajib: tidak menghabiskan jatah fleksibel
+	if _, err := s.UpsertBudget(ctx, Budget{Period: p.Key, CategoryID: cicil, Amount: 4_000_000, Mandatory: true}); err != nil {
+		t.Fatal(err)
+	}
+	mk("expense", 100_000, makan, p.Start.AddDate(0, 0, 2).Format("2006-01-02")) // minggu 1
+	mk("expense", 250_000, makan, p.Start.AddDate(0, 0, 9).Format("2006-01-02")) // minggu 2
+
+	d, err := s.Dashboard(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := d.Weekly
+	if w == nil {
+		t.Fatal("jatah mingguan harus aktif di buku Pribadi")
+	}
+	if w.Pool != 6_000_000 || w.Mandatory != 4_000_000 || len(w.Weeks) != 4 {
+		t.Fatalf("pool/wajib: %+v", w)
+	}
+	days := p.Days()
+	if w.Weeks[0].Days != 8 || w.Weeks[1].Days != 8 || w.Weeks[2].Days != 8 || w.Weeks[3].Days != days-24 {
+		t.Fatalf("hari per minggu: %+v", w.Weeks)
+	}
+	var total int64
+	for _, wk := range w.Weeks {
+		total += wk.Allowance
+	}
+	if total != w.Pool {
+		t.Fatalf("total jatah mingguan %d harus sama dengan pool %d", total, w.Pool)
+	}
+	if w.Weeks[0].Spent != 100_000 || w.Weeks[1].Spent != 250_000 || w.Spent != 350_000 {
+		t.Fatalf("belanja per minggu: %+v", w.Weeks)
+	}
+	if w.Remaining != 6_000_000-350_000 {
+		t.Fatalf("sisa total: %d", w.Remaining)
+	}
+	// wajib yang membengkak mengurangi pool
+	mk("expense", 500_000, cicil, start)
+	d, _ = s.Dashboard(ctx, p)
+	if d.Weekly.Mandatory != 4_500_000 || d.Weekly.Pool != 5_500_000 {
+		t.Fatalf("wajib bengkak: %+v", d.Weekly)
+	}
+	// buku Work: mati secara bawaan
+	dw, _ := s.Dashboard(WithLedger(ctx, 2), p)
+	if dw.Weekly != nil {
+		t.Fatal("jatah mingguan seharusnya mati di buku Work")
 	}
 }

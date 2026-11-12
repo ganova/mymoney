@@ -231,3 +231,10 @@ Setiap baris pengeluaran budget kini punya jenis:
 - **Fleksibel**: angka dan kemunculannya belum pasti (jajan, bensin, belanja harian). Dihitung sebagai jatah harian.
 
 Tanggal jatuh tempo tidak lagi menentukan jenis; baris dengan tanggal otomatis menjadi wajib. Saat menyusun budget dengan AI, jenis setiap baris ikut diusulkan dan bisa diubah sebelum disimpan.
+
+## Jatah mingguan
+Untuk buku Pribadi (bisa diatur per buku di Pengaturan → Jatah mingguan), uang fleksibel dibagi per minggu, bukan per hari:
+- **Pool** = pendapatan periode − budget wajib. Pendapatan memakai nilai terbesar antara realisasi dan rencana; budget wajib memakai nilai terbesar antara rencana dan realisasi, jadi wajib yang membengkak ikut mengurangi uang fleksibel.
+- **4 minggu**: minggu 1–3 masing-masing 8 hari (dari tanggal mulai periode), minggu 4 sisanya sampai akhir periode (4–7 hari). Pool dibagi sebanding jumlah hari; selisih pembulatan masuk ke minggu 4.
+- **Terpakai** = semua pengeluaran yang bukan kategori budget wajib (fleksibel dan yang belum punya budget). Transfer tidak dihitung.
+- Beranda menampilkan jatah minggu berjalan (sisa, terpakai, sisa per hari) dan ringkasan 4 minggu.

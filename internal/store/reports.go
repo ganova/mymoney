@@ -69,6 +69,9 @@ type Dashboard struct {
 	CreditBalance int64     `json:"credit_balance"`
 	DebtRemaining int64     `json:"debt_remaining"`
 
+	// Weekly: jatah fleksibel per minggu (nil bila dimatikan untuk buku ini).
+	Weekly *WeeklyPlan `json:"weekly,omitempty"`
+
 	Recent           []Transaction `json:"recent"`
 	Alerts           []Alert       `json:"alerts"`
 	BudgetAutoCopied bool          `json:"budget_auto_copied"`
@@ -261,6 +264,20 @@ func (s *Store) Dashboard(ctx context.Context, p period.Period) (*Dashboard, err
 	}
 	if d.DaysLeft > 0 && d.FlexRemaining > 0 {
 		d.DailyAllowance = d.FlexRemaining / int64(d.DaysLeft)
+	}
+	if st, err := s.GetSettings(ctx); err == nil && st.WeeklyAllowance {
+		if d.Weekly, err = s.weeklyPlan(ctx, p, d); err != nil {
+			return nil, err
+		}
+		// jatah harian mengikuti sisa minggu berjalan
+		if d.IsCurrent {
+			d.DailyAllowance = 0
+			for _, wk := range d.Weekly.Weeks {
+				if wk.Current {
+					d.DailyAllowance = wk.DailyLeft
+				}
+			}
+		}
 	}
 
 	d.Alerts = s.alerts(d, p, catName)

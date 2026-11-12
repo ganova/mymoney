@@ -3,7 +3,7 @@
   import { app, ui, cat, source, openTx, askAssistant, setDock, toastError } from '../lib/state.svelte';
   import { api, qs } from '../lib/api';
   import { go } from '../lib/router.svelte';
-  import { rp, rpc, pct, greeting, shortDate, markdown } from '../lib/format';
+  import { rp, rpc, rpShort, pct, greeting, shortDate, markdown } from '../lib/format';
   import Icon from '../components/Icon.svelte';
   import TxItem from '../components/TxItem.svelte';
   import DailyBars from '../components/DailyBars.svelte';
@@ -153,7 +153,38 @@
   {:else if d}
     <!-- Kartu utama -->
     <section class="card hero m-half l4" class:dim={loading}>
-      {#if hasBudget && d.is_current}
+      {#if d.weekly && d.weekly.weeks.length}
+        {@const w = d.weekly}
+        {@const cur = w.weeks.find((x) => x.current)}
+        {#if cur && d.is_current}
+          {@const wp = cur.allowance > 0 ? Math.min(100, pct(cur.spent, cur.allowance)) : cur.spent > 0 ? 100 : 0}
+          <div class="small muted">Jatah minggu ke-{cur.index} · {shortDate(cur.start)} – {shortDate(cur.end)}</div>
+          <div class="big num" class:bad={cur.remaining < 0}>{rp(cur.remaining)}</div>
+          <div class="row between small">
+            <span class="text-2">Terpakai <strong class="num">{rp(cur.spent)}</strong> dari {rp(cur.allowance)}</span>
+            {#if cur.remaining < 0}<span class="badge bad">Lewat {rp(-cur.remaining)}</span>{/if}
+          </div>
+          <div class="meter" class:over={cur.remaining < 0}><i style:width="{wp}%"></i></div>
+          <div class="row between tiny muted foot">
+            <span>{cur.remaining > 0 ? `${rp(cur.daily_left)}/hari` : 'Jatah minggu ini habis'}</span>
+            <span>{cur.days_left} hari lagi di minggu ini</span>
+          </div>
+        {:else}
+          <div class="small muted">Uang fleksibel {d.period.label}</div>
+          <div class="big num">{rp(w.pool)}</div>
+          <div class="small text-2">Terpakai <strong class="num">{rp(w.spent)}</strong> · sisa {rp(w.remaining)}</div>
+        {/if}
+        <div class="weeks">
+          {#each w.weeks as wk (wk.index)}
+            <div class="wk" class:cur={wk.current} class:past={wk.past} class:over={wk.remaining < 0}>
+              <div class="tiny muted">Mgg {wk.index}</div>
+              <div class="num wv">{rpShort(wk.allowance)}</div>
+              <div class="tiny" class:bad={wk.remaining < 0}>{wk.current || wk.past ? (wk.remaining < 0 ? `−${rpShort(-wk.remaining)}` : `sisa ${rpShort(wk.remaining)}`) : `${wk.days} hari`}</div>
+            </div>
+          {/each}
+        </div>
+        <div class="tiny muted">Pendapatan {rpc(w.income)} − wajib {rpc(w.mandatory)} = {rpc(w.pool)} dibagi per hari ({rpc(w.daily_rate)}/hari)</div>
+      {:else if hasBudget && d.is_current}
         <div class="small muted">Jatah aman per hari</div>
         <div class="big num">{rp(d.daily_allowance)}</div>
         <div class="row between small">
@@ -386,6 +417,13 @@
   .hero { padding: 18px; display: flex; flex-direction: column; gap: 8px; transition: opacity 0.2s; }
   .hero .big { font-size: 40px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
   .hero .foot { margin-top: 2px; }
+  .weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; }
+  .wk { background: var(--surface-2); border-radius: 10px; padding: 7px 6px; text-align: center; min-width: 0; }
+  .wk .wv { font-weight: 700; font-size: 14px; white-space: nowrap; }
+  .wk .tiny { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wk.cur { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
+  .wk.past { opacity: 0.75; }
+  .wk.over { background: var(--bad-soft); }
   .cta { text-align: left; }
   .dim { opacity: 0.6; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
