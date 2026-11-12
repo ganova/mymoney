@@ -1,13 +1,14 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"path/filepath"
-
-	"context"
-	"github.com/ganova/mymoney/internal/period"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/ganova/mymoney/internal/period"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -459,12 +460,22 @@ func TestWeeklyAllowance(t *testing.T) {
 	if w.Weeks[0].Days != 8 || w.Weeks[1].Days != 8 || w.Weeks[2].Days != 8 || w.Weeks[3].Days != days-24 {
 		t.Fatalf("hari per minggu: %+v", w.Weeks)
 	}
-	var total int64
-	for _, wk := range w.Weeks {
-		total += wk.Allowance
+	// bagian dasar tiap minggu menjumlah pas ke pool; sisa minggu lalu pindah ke minggu berikutnya
+	var base int64
+	for i, wk := range w.Weeks {
+		base += wk.Base
+		if wk.Allowance != wk.Base+wk.Carry {
+			t.Fatalf("minggu %d: jatah %d != base %d + carry %d", i+1, wk.Allowance, wk.Base, wk.Carry)
+		}
+		if i > 0 && w.Weeks[i-1].Past && wk.Carry != w.Weeks[i-1].Remaining {
+			t.Fatalf("minggu %d harus membawa sisa minggu %d (%d), dapat %d", i+1, i, w.Weeks[i-1].Remaining, wk.Carry)
+		}
+		if i > 0 && !w.Weeks[i-1].Past && wk.Carry != 0 {
+			t.Fatalf("minggu %d belum boleh membawa apa-apa: %d", i+1, wk.Carry)
+		}
 	}
-	if total != w.Pool {
-		t.Fatalf("total jatah mingguan %d harus sama dengan pool %d", total, w.Pool)
+	if base != w.Pool {
+		t.Fatalf("total bagian dasar %d harus sama dengan pool %d", base, w.Pool)
 	}
 	if w.Weeks[0].Spent != 100_000 || w.Weeks[1].Spent != 250_000 || w.Spent != 350_000 {
 		t.Fatalf("belanja per minggu: %+v", w.Weeks)
@@ -538,5 +549,26 @@ func TestMigrateRenamesExistingLedgers(t *testing.T) {
 	cats, _ := s.ListCategories(WithLedger(t.Context(), 2))
 	if len(cats) != 1 || cats[0].Name != "Lain-lain Freelance" || cats[0].Group != "Freelance" {
 		t.Fatalf("kategori: %+v", cats)
+	}
+}
+
+func TestBackupCreatesAndPrunes(t *testing.T) {
+	s := newTestStore(t)
+	dir := filepath.Join(t.TempDir(), "backups")
+	for i := 0; i < 3; i++ {
+		if _, err := s.Backup(t.Context(), dir, 2); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(1100 * time.Millisecond) // nama berkas per detik
+	}
+	list, err := ListBackups(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("harus menyisakan 2 backup terbaru, ada %d", len(list))
+	}
+	if !strings.HasPrefix(list[0].Name, "mymoney-") || list[0].Size == 0 {
+		t.Fatalf("berkas backup: %+v", list[0])
 	}
 }

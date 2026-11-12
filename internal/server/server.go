@@ -29,6 +29,10 @@ type Server struct {
 	static  fs.FS
 	limiter *loginLimiter
 	mux     *http.ServeMux
+	// backup otomatis
+	backupDir   string
+	backupKeep  int
+	backupEvery time.Duration
 }
 
 // New menyusun server beserta seluruh rute.
@@ -37,7 +41,8 @@ func New(cfg config.Config, st *store.Store, aiSvc *ai.Service, static fs.FS) (*
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{store: st, ai: aiSvc, cfg: cfg, secret: secret, static: static, limiter: newLoginLimiter(), mux: http.NewServeMux()}
+	s := &Server{store: st, ai: aiSvc, cfg: cfg, secret: secret, static: static, limiter: newLoginLimiter(), mux: http.NewServeMux(),
+		backupDir: BackupDir(cfg.DataDir, cfg.BackupDir), backupKeep: cfg.BackupKeep, backupEvery: cfg.BackupEvery}
 	s.routes()
 	return s, nil
 }
@@ -125,6 +130,8 @@ func (s *Server) routes() {
 
 	p("GET /api/export", s.handleExport)
 	p("GET /api/backup", s.handleBackup)
+	p("GET /api/backup/status", s.handleBackupStatus)
+	p("POST /api/backup/now", s.handleBackupNow)
 
 	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "endpoint tidak ditemukan") })
 	m.Handle("/", s.staticHandler())

@@ -238,3 +238,8 @@ Untuk buku Utama (bisa diatur per buku di Pengaturan → Jatah mingguan), uang f
 - **4 minggu**: minggu 1–3 masing-masing 8 hari (dari tanggal mulai periode), minggu 4 sisanya sampai akhir periode (4–7 hari). Pool dibagi sebanding jumlah hari; selisih pembulatan masuk ke minggu 4.
 - **Terpakai** = semua pengeluaran yang bukan kategori budget wajib (fleksibel dan yang belum punya budget). Transfer tidak dihitung.
 - Beranda menampilkan jatah minggu berjalan (sisa, terpakai, sisa per hari) dan ringkasan 4 minggu.
+
+## Backup otomatis
+- Database disalin otomatis saat aplikasi jalan dan tiap 24 jam (ubah dengan `BACKUP_EVERY_HOURS`; `0` mematikan). Hanya 14 versi terakhir yang disimpan (`BACKUP_KEEP`).
+- Lokasi: `data\backups` di samping program. Untuk menyimpan di luar PC, isi `BACKUP_DIR` di `.env` dengan folder yang tersinkron (mis. Google Drive). Pengaturan → Backup menampilkan lokasi dan backup terakhir, dan tombol untuk membuat backup sekarang.
+- Berkas backup adalah database SQLite biasa: bisa dibuka lagi atau dikembalikan dengan mengganti `mymoney.db` saat aplikasi berhenti.

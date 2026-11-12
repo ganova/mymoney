@@ -3,6 +3,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,6 +70,9 @@ type Config struct {
 	CodexModel       string
 	ClaudePath       string
 	ClaudeModel      string
+	BackupDir        string // kosong = data/backups
+	BackupKeep       int    // jumlah backup yang disimpan
+	BackupEvery      time.Duration
 }
 
 func env(key, def string) string {
@@ -76,6 +80,14 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func envInt(key string, def int) int {
+	var v int
+	if _, err := fmt.Sscanf(env(key, ""), "%d", &v); err != nil || v < 0 {
+		return def
+	}
+	return v
 }
 
 // Load membaca konfigurasi.
@@ -104,5 +116,8 @@ func Load() Config {
 		CodexModel:       os.Getenv("CODEX_MODEL"),
 		ClaudePath:       os.Getenv("CLAUDE_PATH"),
 		ClaudeModel:      os.Getenv("CLAUDE_MODEL"),
+		BackupDir:        os.Getenv("BACKUP_DIR"),
+		BackupKeep:       envInt("BACKUP_KEEP", 14),
+		BackupEvery:      time.Duration(envInt("BACKUP_EVERY_HOURS", 24)) * time.Hour,
 	}
 }

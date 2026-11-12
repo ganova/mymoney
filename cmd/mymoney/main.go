@@ -90,6 +90,10 @@ func main() {
 		log.Printf("AI belum aktif — isi ANTHROPIC_API_KEY untuk fitur AI. Parser offline tetap bisa dipakai.")
 	}
 
+	bctx, stopBackups := context.WithCancel(context.Background())
+	defer stopBackups()
+	go srv.RunBackups(bctx, srv.BackupFolder(), cfg.BackupKeep, cfg.BackupEvery)
+
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv,

@@ -169,6 +169,11 @@
             <span>{cur.remaining > 0 ? `${rp(cur.daily_left)}/hari` : 'Jatah minggu ini habis'}</span>
             <span>{cur.days_left} hari lagi di minggu ini</span>
           </div>
+          {#if cur.carry !== 0}
+            <div class="tiny" class:good={cur.carry > 0} class:bad={cur.carry < 0}>
+              {cur.carry > 0 ? `Termasuk sisa minggu lalu +${rpShort(cur.carry)}` : `Termasuk kekurangan minggu lalu −${rpShort(-cur.carry)}`}
+            </div>
+          {/if}
         {:else}
           <div class="small muted">Uang fleksibel {d.period.label}</div>
           <div class="big num">{rp(w.pool)}</div>

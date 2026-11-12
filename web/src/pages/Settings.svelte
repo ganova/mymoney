@@ -15,6 +15,8 @@
   let rules = $state<Rule[]>([]);
   let showRules = $state(false);
   let usage = $state<{ since: string; usage: Usage[] } | null>(null);
+  let backup = $state<{ dir: string; count: number; keep: number; every_hours: number; last?: { name: string; size: number; mod_time: string } } | null>(null);
+  let backing = $state(false);
   let aiTest = $state<{ ok: boolean; message: string; ms?: number } | null>(null);
   let aiTesting = $state(false);
   let theme = $state(localStorage.getItem('mm_theme') ?? 'auto');
@@ -29,7 +31,21 @@
     api.get<APIToken[]>('/tokens').then((t) => (tokens = t)).catch(() => {});
     api.get<Rule[]>('/rules').then((r) => (rules = r)).catch(() => {});
     api.get<typeof usage>('/ai/usage').then((u) => (usage = u)).catch(() => {});
+    api.get<typeof backup>('/backup/status').then((b) => (backup = b)).catch(() => {});
   });
+
+  async function backupNow() {
+    backing = true;
+    try {
+      await api.post('/backup/now');
+      backup = await api.get<typeof backup>('/backup/status');
+      toast('Backup tersimpan');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      backing = false;
+    }
+  }
 
   const preview = $derived.by(() => {
     const d = s.period_start_day;
@@ -243,6 +259,20 @@
           {#if cost(u)}<span class="num bold">≈ ${cost(u).toFixed(2)}</span>{/if}
         </div>
       {/each}
+    {/if}
+  </div>
+
+  <div class="section-label">Backup</div>
+  <div class="card stack">
+    {#if backup}
+      <div class="small text-2">Disimpan otomatis tiap {backup.every_hours} jam ke <code>{backup.dir}</code>, {backup.keep} versi terakhir.</div>
+      {#if backup.last}
+        <div class="row between small"><span class="muted">Terakhir</span><span class="num">{backup.last.name.replace('mymoney-', '').replace('.db', '')}</span></div>
+      {:else}
+        <div class="small text-2">Belum ada backup.</div>
+      {/if}
+      <button class="btn block" onclick={backupNow} disabled={backing}>{#if backing}<span class="spinner"></span>{/if} Buat backup sekarang</button>
+      <p class="tiny muted">Tip: isi <code>BACKUP_DIR</code> di .env dengan folder yang ikut tersinkron (mis. Google Drive) agar salinannya aman di luar PC.</p>
     {/if}
   </div>
 

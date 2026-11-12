@@ -37,6 +37,8 @@ export interface AIStatus {
 
 export interface WeekPlan {
   index: number;
+  base: number;
+  carry: number;
   start: string;
   end: string;
   days: number;

@@ -13,7 +13,9 @@ type WeekPlan struct {
 	Start     string `json:"start"`
 	End       string `json:"end"`
 	Days      int    `json:"days"`
-	Allowance int64  `json:"allowance"` // jatah minggu ini
+	Base      int64  `json:"base"`      // bagian dari pool sesuai jumlah hari
+	Carry     int64  `json:"carry"`     // sisa (+) atau lebih (−) minggu sebelumnya yang dibawa
+	Allowance int64  `json:"allowance"` // jatah minggu ini = base + carry
 	Spent     int64  `json:"spent"`     // pengeluaran fleksibel di minggu ini
 	Remaining int64  `json:"remaining"` // allowance - spent (boleh negatif)
 	Current   bool   `json:"current"`
@@ -62,6 +64,7 @@ func (s *Store) weeklyPlan(ctx context.Context, p period.Period, d *Dashboard) (
 	today := d.Today
 	start := p.Start
 	var allocated int64
+	var carry int64 // dari minggu-minggu yang sudah lewat
 	for i := 0; i < 4; i++ {
 		n := 8
 		if i == 3 {
@@ -74,17 +77,24 @@ func (s *Store) weeklyPlan(ctx context.Context, p period.Period, d *Dashboard) (
 		to := from.AddDate(0, 0, n-1)
 		wk := WeekPlan{Index: i + 1, Start: from.Format("2006-01-02"), End: to.Format("2006-01-02"), Days: n}
 		if i == 3 {
-			wk.Allowance = pool - allocated // sisa agar total pas
+			wk.Base = pool - allocated // sisa agar total pas
 		} else {
-			wk.Allowance = pool * int64(n) / int64(days)
-			allocated += wk.Allowance
+			wk.Base = pool * int64(n) / int64(days)
+			allocated += wk.Base
 		}
+		wk.Carry = carry
+		wk.Allowance = wk.Base + wk.Carry
 		spent, err := s.flexSpent(ctx, wk.Start, wk.End, p.Key, mandatoryCats)
 		if err != nil {
 			return nil, err
 		}
 		wk.Spent = spent
 		wk.Remaining = wk.Allowance - wk.Spent
+		// minggu yang sudah selesai menurunkan/menaikkan jatah minggu berikutnya
+		carry = wk.Remaining
+		if !(today > wk.End) {
+			carry = 0 // belum selesai: belum ada yang dibawa
+		}
 		switch {
 		case today > wk.End:
 			wk.Past = true
