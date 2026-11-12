@@ -174,7 +174,7 @@ func (c *Context) Describe() string {
 	}
 
 	if c.Ledger.Name != "" {
-		fmt.Fprintf(&b, "Buku keuangan aktif: %s. Pengguna punya dua buku terpisah (Pribadi dan Work); semua data di bawah hanya milik buku %s.\n", c.Ledger.Name, c.Ledger.Name)
+		fmt.Fprintf(&b, "Buku keuangan aktif: %s. Pengguna punya dua buku terpisah (Utama dan Freelance); semua data di bawah hanya milik buku %s.\n", c.Ledger.Name, c.Ledger.Name)
 	}
 
 	b.WriteString("\n## Akun (kas/dompet)\n")
@@ -305,7 +305,7 @@ func (c *Context) Sanitize(d Draft, source string) Draft {
 	if d.CategoryID == nil && d.Type != "transfer" {
 		// pakai kategori "Lain-lain" / "Pemasukan Lain" sebagai cadangan
 		for _, x := range c.Categories {
-			if x.Kind == d.Type && !x.Archived && (x.Name == "Lain-lain" || x.Name == "Pemasukan Lain" || x.Name == "Lain-lain Work" || x.Name == "Pemasukan Work Lain") {
+			if x.Kind == d.Type && !x.Archived && (x.Name == "Lain-lain" || x.Name == "Pemasukan Lain" || x.Name == "Lain-lain Freelance" || x.Name == "Pemasukan Freelance Lain") {
 				id := x.ID
 				d.CategoryID = &id
 				d.Confidence = min(d.Confidence, 0.5)

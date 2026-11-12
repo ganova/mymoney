@@ -187,10 +187,10 @@ Struktur: `cmd/mymoney` (main), `internal/*` (backend), `web/src` (frontend: `pa
 ## AI lewat Codex CLI (tanpa API key)
 Pasang Codex CLI di PC (`npm i -g @openai/codex`, lalu `codex login`). Bila `ANTHROPIC_API_KEY` kosong, MyMoney otomatis memakai `codex exec` untuk membaca kalimat, screenshot, dan tanya-jawab (memakai kuota langganan ChatGPT). Atur dengan `AI_PROVIDER` (`auto`/`codex`/`offline`), `CODEX_PATH`, `CODEX_MODEL`. PDF tetap dibaca offline; saran budget & analisis butuh API key. Bila Codex gagal, aplikasi kembali ke parser offline.
 
-## Dua buku (Pribadi & Work) dan sumber pemasukan
-- Tombol **Pribadi | Work** di atas aplikasi memilih buku keuangan. Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri; data lama otomatis masuk ke Pribadi. Transfer antar buku (mis. Work → Pribadi) dicatat lewat jenis *Transfer*.
+## Dua buku (Utama & Freelance) dan sumber pemasukan
+- Tombol **Utama | Freelance** di atas aplikasi memilih buku keuangan. Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri; data lama otomatis masuk ke Utama. Transfer antar buku (mis. Freelance → Utama) dicatat lewat jenis *Transfer*.
 - Pemasukan bisa diberi **sumber** (bawaan: CMW dan Freelance; kelola di Lainnya → Sumber Pemasukan & Buku). AI, parser offline, dan Codex mengisinya dari kata kunci; Beranda dan Laporan menampilkan total per sumber.
-- iPhone Shortcut: tambahkan `?ledger=2` pada URL (atau header `X-Ledger: 2`) untuk mencatat ke buku Work; tanpa itu masuk ke Pribadi.
+- iPhone Shortcut: tambahkan `?ledger=2` pada URL (atau header `X-Ledger: 2`) untuk mencatat ke buku Freelance; tanpa itu masuk ke Utama.
 
 ## Build & update di Windows (tanpa unduh exe)
 Sekali: `winget install Git.Git GoLang.Go OpenJS.NodeJS.LTS`, buka PowerShell baru, lalu
@@ -200,7 +200,7 @@ Setiap kali ingin memasang/memperbarui: `powershell -ExecutionPolicy Bypass -Fil
 
 ## Pendapatan tertunda & proyeksi utang
 - **Lainnya → Pendapatan Tertunda**: catat proyek yang sudah dibayar klien tetapi dananya ditahan (mis. Fastwork) beserta nominal bersih, estimasi tanggal cair, dan sumbernya. Tombol *Sudah cair* membuat transaksi pemasukan di akun yang dipilih (nominal boleh berbeda, mis. dipotong biaya platform).
-- Halaman itu menampilkan total yang akan cair dan proyeksi per periode (pendapatan tertunda vs cicilan utang). **Utang & Cicilan** menampilkan jadwal cicilan per periode, total, dan perkiraan lunas. Beranda punya kartu "Ke depan". Data per buku (Pribadi/Work). API: `/api/receivables`, `/api/outlook`.
+- Halaman itu menampilkan total yang akan cair dan proyeksi per periode (pendapatan tertunda vs cicilan utang). **Utang & Cicilan** menampilkan jadwal cicilan per periode, total, dan perkiraan lunas. Beranda punya kartu "Ke depan". Data per buku (Utama/Freelance). API: `/api/receivables`, `/api/outlook`.
 - **Baca dari screenshot**: di Pendapatan Tertunda, tombol *Baca gambar* menerima screenshot daftar pesanan (mis. Fastwork: ID pesanan, tanggal jatuh tempo, partner, status, harga). AI (API Claude/Codex) bila aktif, atau OCR offline sebagai cadangan; hasilnya ditampilkan untuk dicek dulu. Ada kolom opsional *potongan platform (%)*; pesanan yang sudah tercatat (ID/nama+nominal sama) ditandai agar tidak ganda. API: `POST /api/receivables/scan` lalu `POST /api/receivables/bulk`.
 
 ## Mode AI & cadangan tanpa AI
@@ -218,7 +218,7 @@ Pasang Claude CLI: `npm i -g @anthropic-ai/claude-code`, lalu jalankan `claude` 
 
 ## Tampilan desktop (layar ≥ 1024px)
 Tampilan ponsel tidak berubah; di layar lebar aplikasi memakai kerangka berbeda:
-- **Sidebar kiri**: semua halaman, pemilih buku Pribadi/Work, tombol *Transaksi baru*, pencarian, dan total saldo.
+- **Sidebar kiri**: semua halaman, pemilih buku Utama/Freelance, tombol *Transaksi baru*, pencarian, dan total saldo.
 - **Panel Asisten di kanan** (Ctrl+J): chat AI selalu tersedia di samping halaman mana pun; kolom "Catat atau tanya" di Beranda mengirim ke panel ini tanpa pindah halaman.
 - **Palet perintah** (Ctrl+K atau `/`): cari transaksi, buka halaman, lompat ke akun/kategori, ganti buku/tema, atau ketik kalimat seperti "makan 25rb" untuk langsung dicatat.
 - **Pintasan keyboard**: `N` transaksi baru, `G` lalu `H/T/B/L/A/U/P/S` pindah halaman, `?` daftar pintasan.
@@ -233,7 +233,7 @@ Setiap baris pengeluaran budget kini punya jenis:
 Tanggal jatuh tempo tidak lagi menentukan jenis; baris dengan tanggal otomatis menjadi wajib. Saat menyusun budget dengan AI, jenis setiap baris ikut diusulkan dan bisa diubah sebelum disimpan.
 
 ## Jatah mingguan
-Untuk buku Pribadi (bisa diatur per buku di Pengaturan → Jatah mingguan), uang fleksibel dibagi per minggu, bukan per hari:
+Untuk buku Utama (bisa diatur per buku di Pengaturan → Jatah mingguan), uang fleksibel dibagi per minggu, bukan per hari:
 - **Pool** = pendapatan periode − budget wajib. Pendapatan memakai nilai terbesar antara realisasi dan rencana; budget wajib memakai nilai terbesar antara rencana dan realisasi, jadi wajib yang membengkak ikut mengurangi uang fleksibel.
 - **4 minggu**: minggu 1–3 masing-masing 8 hari (dari tanggal mulai periode), minggu 4 sisanya sampai akhir periode (4–7 hari). Pool dibagi sebanding jumlah hari; selisih pembulatan masuk ke minggu 4.
 - **Terpakai** = semua pengeluaran yang bukan kategori budget wajib (fleksibel dan yang belum punya budget). Transfer tidak dihitung.

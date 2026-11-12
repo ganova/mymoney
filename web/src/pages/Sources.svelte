@@ -95,7 +95,7 @@
       </button>
     {/each}
   </div>
-  <p class="tiny muted">Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri. Transfer antar buku (mis. Work → Pribadi) bisa dicatat lewat jenis Transfer.</p>
+  <p class="tiny muted">Tiap buku punya akun, kategori, budget, utang, dan laporan sendiri. Transfer antar buku (mis. Freelance → Utama) bisa dicatat lewat jenis Transfer.</p>
 </div>
 
 <Sheet open={!!edit} onclose={() => (edit = null)} title={edit?.id ? 'Ubah sumber' : 'Sumber baru'}>

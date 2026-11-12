@@ -484,3 +484,59 @@ func TestWeeklyAllowance(t *testing.T) {
 		t.Fatal("jatah mingguan seharusnya mati di buku Work")
 	}
 }
+
+func TestLedgerRenamedToUtamaAndFreelance(t *testing.T) {
+	s := newTestStore(t)
+	ls, _ := s.ListLedgers(t.Context())
+	if len(ls) != 2 || ls[0].Name != "Utama" || ls[1].Name != "Freelance" {
+		t.Fatalf("nama buku: %+v", ls)
+	}
+	wa, _ := s.ListAccounts(WithLedger(t.Context(), 2))
+	if len(wa) != 2 || wa[0].Name != "Rekening Freelance" || wa[1].Name != "Kas Freelance" {
+		t.Fatalf("akun buku Freelance: %+v", wa)
+	}
+}
+
+func TestMigrateRenamesExistingLedgers(t *testing.T) {
+	dir := t.TempDir()
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "mymoney.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// database lama di v5 dengan nama bawaan lama; satu akun sudah diganti nama oleh pengguna
+	for _, q := range migrations[:5] {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, q := range []string{
+		`CREATE TABLE schema_version (version INTEGER NOT NULL)`, `INSERT INTO schema_version VALUES (5)`,
+		`INSERT INTO accounts (name, ledger_id) VALUES ('Rekening Work', 2), ('Kas Saya', 2)`,
+		`INSERT INTO categories (name, kind, grp, ledger_id) VALUES ('Lain-lain Work', 'expense', 'Work', 2)`,
+		`INSERT INTO settings (key, value) VALUES ('work_seeded', '1')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	s, err := Open(dir, loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ls, _ := s.ListLedgers(t.Context())
+	if ls[0].Name != "Utama" || ls[1].Name != "Freelance" {
+		t.Fatalf("nama buku setelah migrasi: %+v", ls)
+	}
+	wa, _ := s.ListAccounts(WithLedger(t.Context(), 2))
+	names := []string{wa[0].Name, wa[1].Name}
+	if names[0] != "Rekening Freelance" || names[1] != "Kas Saya" {
+		t.Fatalf("akun: %v (yang diganti pengguna harus tetap)", names)
+	}
+	cats, _ := s.ListCategories(WithLedger(t.Context(), 2))
+	if len(cats) != 1 || cats[0].Name != "Lain-lain Freelance" || cats[0].Group != "Freelance" {
+		t.Fatalf("kategori: %+v", cats)
+	}
+}

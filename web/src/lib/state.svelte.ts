@@ -151,7 +151,7 @@ export async function changed(): Promise<void> {
   }
 }
 
-/** Pindah buku keuangan (Pribadi/Work) lalu muat ulang seluruh data. */
+/** Pindah buku keuangan (Utama/Freelance) lalu muat ulang seluruh data. */
 export async function switchLedger(id: number): Promise<void> {
   if (id === app.ledgerId) return;
   setLedger(id);

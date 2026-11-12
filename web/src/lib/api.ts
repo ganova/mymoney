@@ -7,7 +7,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Buku keuangan aktif (Pribadi/Work), dikirim ke server di setiap permintaan. */
+/** Buku keuangan aktif (Utama/Freelance), dikirim ke server di setiap permintaan. */
 const LEDGER_KEY = 'mymoney.ledger';
 let ledgerId = 0;
 try {

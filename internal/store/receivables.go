@@ -151,7 +151,7 @@ func (s *Store) ReceiveReceivable(ctx context.Context, id, accountID, amount int
 	}
 	var catID *int64
 	cats, _ := s.ListCategories(ctx)
-	for _, want := range []string{"Pembayaran Klien", "Pemasukan Work Lain", "Pemasukan Lain"} {
+	for _, want := range []string{"Pembayaran Klien", "Pemasukan Freelance Lain", "Pemasukan Lain"} {
 		for _, c := range cats {
 			if c.Kind == "income" && !c.Archived && c.Name == want {
 				id := c.ID

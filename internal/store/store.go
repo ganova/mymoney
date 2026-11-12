@@ -260,6 +260,15 @@ CREATE INDEX idx_recv_ledger ON receivables(ledger_id, status);
 	// terpisah dari tanggal jatuh tempo. Baris lama yang punya tanggal dianggap wajib.
 	`ALTER TABLE budgets ADD COLUMN mandatory INTEGER NOT NULL DEFAULT 0;
 UPDATE budgets SET mandatory = 1 WHERE due_day > 0;`,
+	// v6: buku "Pribadi" → "Utama" dan "Work" → "Freelance" (hanya bila belum diganti pengguna),
+	// termasuk nama bawaan akun dan kategori buku kedua.
+	`UPDATE ledgers SET name = 'Utama' WHERE id = 1 AND name = 'Pribadi';
+UPDATE ledgers SET name = 'Freelance', icon = '🧑‍💻' WHERE id = 2 AND name = 'Work';
+UPDATE accounts SET name = 'Rekening Freelance' WHERE ledger_id = 2 AND name = 'Rekening Work';
+UPDATE accounts SET name = 'Kas Freelance' WHERE ledger_id = 2 AND name = 'Kas Work';
+UPDATE categories SET grp = 'Freelance' WHERE ledger_id = 2 AND grp = 'Work';
+UPDATE categories SET name = 'Lain-lain Freelance' WHERE ledger_id = 2 AND name = 'Lain-lain Work';
+UPDATE categories SET name = 'Pemasukan Freelance Lain' WHERE ledger_id = 2 AND name = 'Pemasukan Work Lain';`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

@@ -149,7 +149,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // withLedger memilih buku keuangan aktif dari header X-Ledger atau ?ledger=
-// (default: Pribadi). Buku yang tidak dikenal diabaikan.
+// (default: Utama). Buku yang tidak dikenal diabaikan.
 func (s *Server) withLedger(r *http.Request) context.Context {
 	v := r.Header.Get("X-Ledger")
 	if v == "" {

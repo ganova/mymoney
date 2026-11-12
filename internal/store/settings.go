@@ -19,7 +19,7 @@ type Settings struct {
 	// AICLI: sumber AI saat mode "Pakai AI": auto | api | codex | claude.
 	AICLI string `json:"ai_cli"`
 	// WeeklyAllowance: jatah fleksibel dibagi per minggu (bukan harian) untuk
-	// buku aktif. Bawaan: aktif di buku Pribadi, mati di buku lain.
+	// buku aktif. Bawaan: aktif di buku Utama, mati di buku lain.
 	WeeklyAllowance bool `json:"weekly_allowance"`
 }
 
@@ -28,7 +28,7 @@ func weeklyKey(ctx context.Context) string {
 	return "weekly_allowance_" + strconv.FormatInt(LedgerID(ctx), 10)
 }
 
-// defaultAccountKey: akun bawaan disimpan per buku (buku Pribadi memakai kunci lama).
+// defaultAccountKey: akun bawaan disimpan per buku (buku Utama memakai kunci lama).
 func defaultAccountKey(ctx context.Context) string {
 	if id := LedgerID(ctx); id != DefaultLedger {
 		return "default_account_id_" + strconv.FormatInt(id, 10)

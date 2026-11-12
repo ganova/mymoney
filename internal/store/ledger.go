@@ -7,7 +7,7 @@ import (
 
 type ledgerKey struct{}
 
-// DefaultLedger adalah buku pertama ("Pribadi").
+// DefaultLedger adalah buku pertama ("Utama").
 const DefaultLedger int64 = 1
 
 // WithLedger menandai buku keuangan aktif pada context; seluruh query akun,
@@ -16,7 +16,7 @@ func WithLedger(ctx context.Context, id int64) context.Context {
 	return context.WithValue(ctx, ledgerKey{}, id)
 }
 
-// LedgerID mengembalikan buku aktif pada context (default: Pribadi).
+// LedgerID mengembalikan buku aktif pada context (default: Utama).
 func LedgerID(ctx context.Context) int64 {
 	if id, ok := ctx.Value(ledgerKey{}).(int64); ok && id > 0 {
 		return id
@@ -24,7 +24,7 @@ func LedgerID(ctx context.Context) int64 {
 	return DefaultLedger
 }
 
-// Ledger adalah satu buku keuangan terpisah (mis. Pribadi dan Work).
+// Ledger adalah satu buku keuangan terpisah (mis. Utama dan Freelance).
 type Ledger struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -150,20 +150,20 @@ func (s *Store) DeleteIncomeSource(ctx context.Context, id int64) error {
 type seedWorkCategory struct{ name, kind, grp, icon, keywords string }
 
 var workCategories = []seedWorkCategory{
-	{"Software & Langganan", "expense", "Work", "💻", "software,langganan,subscription,saas,lisensi,github,figma,notion,chatgpt,openai,claude"},
-	{"Hosting & Domain", "expense", "Work", "🌐", "hosting,domain,vps,server,cloud,aws,gcp,vercel,cloudflare"},
-	{"Peralatan Kerja", "expense", "Work", "🖥️", "laptop,monitor,keyboard,mouse,alat,peralatan,printer,atk"},
-	{"Transport Dinas", "expense", "Work", "🚕", "transport dinas,perjalanan dinas,tiket,hotel,meeting offsite"},
-	{"Makan Meeting", "expense", "Work", "🍽️", "meeting,makan klien,jamuan,coffee meeting"},
-	{"Subkon & Tim", "expense", "Work", "🤝", "subkon,freelancer,tim,bayar desainer,bayar developer"},
-	{"Pajak & Legal", "expense", "Work", "🧾", "pajak,pph,ppn,npwp,legal,notaris,izin"},
-	{"Iklan & Promosi", "expense", "Work", "📣", "iklan,ads,promosi,marketing,meta ads,google ads"},
-	{"Lain-lain Work", "expense", "Work", "📌", ""},
-	{"Pembayaran Klien", "income", "Work", "🧑‍💼", "klien,client,invoice,pelunasan,dp,termin"},
-	{"Pemasukan Work Lain", "income", "Work", "💵", ""},
+	{"Software & Langganan", "expense", "Freelance", "💻", "software,langganan,subscription,saas,lisensi,github,figma,notion,chatgpt,openai,claude"},
+	{"Hosting & Domain", "expense", "Freelance", "🌐", "hosting,domain,vps,server,cloud,aws,gcp,vercel,cloudflare"},
+	{"Peralatan Kerja", "expense", "Freelance", "🖥️", "laptop,monitor,keyboard,mouse,alat,peralatan,printer,atk"},
+	{"Transport Dinas", "expense", "Freelance", "🚕", "transport dinas,perjalanan dinas,tiket,hotel,meeting offsite"},
+	{"Makan Meeting", "expense", "Freelance", "🍽️", "meeting,makan klien,jamuan,coffee meeting"},
+	{"Subkon & Tim", "expense", "Freelance", "🤝", "subkon,freelancer,tim,bayar desainer,bayar developer"},
+	{"Pajak & Legal", "expense", "Freelance", "🧾", "pajak,pph,ppn,npwp,legal,notaris,izin"},
+	{"Iklan & Promosi", "expense", "Freelance", "📣", "iklan,ads,promosi,marketing,meta ads,google ads"},
+	{"Lain-lain Freelance", "expense", "Freelance", "📌", ""},
+	{"Pembayaran Klien", "income", "Freelance", "🧑‍💼", "klien,client,invoice,pelunasan,dp,termin"},
+	{"Pemasukan Freelance Lain", "income", "Freelance", "💵", ""},
 }
 
-// seedWork menyiapkan buku Work (akun & kategori) sekali saja, juga pada
+// seedWork menyiapkan buku Freelance (akun & kategori) sekali saja, juga pada
 // database lama yang baru dimigrasikan.
 func (s *Store) seedWork(ctx context.Context) error {
 	if v, _ := s.GetSetting(ctx, "work_seeded"); v == "1" {
@@ -178,8 +178,8 @@ func (s *Store) seedWork(ctx context.Context) error {
 	tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM accounts WHERE ledger_id = 2`).Scan(&n)
 	if n == 0 {
 		for i, a := range []seedAccount{
-			{"Rekening Work", "bank", "💼", "#37474f", "work,kantor,usaha,rekening work"},
-			{"Kas Work", "cash", "💵", "#2e7d32", "kas work,cash work"},
+			{"Rekening Freelance", "bank", "💼", "#37474f", "freelance,work,usaha,rekening freelance"},
+			{"Kas Freelance", "cash", "💵", "#2e7d32", "kas freelance,cash freelance"},
 		} {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO accounts (name, type, icon, color, aliases, sort, ledger_id) VALUES (?,?,?,?,?,?,2)`,
 				a.name, a.typ, a.icon, a.color, a.aliases, i); err != nil {
