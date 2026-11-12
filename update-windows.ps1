@@ -20,8 +20,15 @@ if ($LASTEXITCODE -ne 0) { Write-Host "git pull gagal (ada perubahan lokal?)"; e
 Write-Host "==> Membangun tampilan (web)"
 Push-Location web
 if (-not (Test-Path node_modules)) { npm install }
+# batas memori Node dinaikkan agar build tidak berhenti dengan "process out of memory"
+$env:NODE_OPTIONS = "--max-old-space-size=4096"
 npm run build
-if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Host "Build web gagal"; exit 1 }
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "Build web gagal. Mencoba ulang dengan batas memori lebih besar..."
+  $env:NODE_OPTIONS = "--max-old-space-size=8192"
+  npm run build
+}
+if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Host "Build web gagal. Tutup aplikasi berat (browser, Docker) lalu ulangi."; exit 1 }
 Pop-Location
 
 Write-Host "==> Membangun program"
