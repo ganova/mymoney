@@ -4,6 +4,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,5 +109,12 @@ func TestClaudeCLIErrors(t *testing.T) {
 	s = New(Config{ClaudePath: fakeClaudeCLI(t, "", `{"text":"ok"}`)}, st)
 	if raw, err := s.runClaude(t.Context(), "x", codexTextSchema(), []Image{{Data: []byte("x"), MediaType: "image/png"}}); err != nil || !strings.Contains(string(raw), "ok") {
 		t.Fatalf("gambar via claude: %s %v", raw, err)
+	}
+}
+
+func TestCodexAccessDeniedHint(t *testing.T) {
+	err := friendlyCodexError(t.Context(), errors.New("exit status 1"), `Error loading config.toml: Failed to read config file C:\Users\CMW\.codex\config.toml: Access is denied. (os error 5)`)
+	if !strings.Contains(err.Error(), "icacls") || !strings.Contains(err.Error(), "takeown") {
+		t.Fatalf("pesan harus memuat cara memperbaiki: %v", err)
 	}
 }

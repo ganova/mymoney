@@ -121,7 +121,11 @@ func (s *Server) extract(ctx context.Context, in ai.ExtractInput) (*ai.ExtractRe
 		off.Notes = "⚠️ AI sedang tidak bisa diakses (" + err.Error() + "). Dibaca tanpa AI — cek sebelum menyimpan. " + off.Notes
 		return off, nil
 	}
-	return nil, fmt.Errorf("AI gagal (%s) dan pembaca tanpa AI juga tidak menemukan transaksi", err.Error())
+	if oerr != nil {
+		// tampilkan penyebab asli (mis. Tesseract belum terpasang), jangan disamarkan
+		return nil, fmt.Errorf("AI gagal (%s) dan pembaca tanpa AI juga gagal (%s)", err.Error(), oerr.Error())
+	}
+	return nil, fmt.Errorf("AI gagal (%s) dan pembaca tanpa AI tidak menemukan transaksi di gambar ini", err.Error())
 }
 
 func (s *Server) extractOffline(ctx context.Context, in ai.ExtractInput) (*ai.ExtractResult, error) {

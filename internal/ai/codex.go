@@ -28,6 +28,8 @@ func friendlyCodexError(ctx context.Context, err error, stderr string) error {
 	switch {
 	case ctx.Err() == context.DeadlineExceeded:
 		return fmt.Errorf("Codex terlalu lama merespons")
+	case strings.Contains(low, "access is denied") && strings.Contains(low, "config.toml"):
+		return fmt.Errorf(`Windows menolak akses ke folder .codex. Perbaiki sekali di PowerShell (Run as Administrator): takeown /F "$env:USERPROFILE\.codex" /R /D Y; icacls "$env:USERPROFILE\.codex" /reset /T /C`)
 	case strings.Contains(low, "newer version of codex") || strings.Contains(low, "upgrade to the latest"):
 		return fmt.Errorf("Codex CLI perlu diperbarui (jalankan: npm i -g @openai/codex@latest)")
 	case strings.Contains(low, "not logged in") || strings.Contains(low, "login") && strings.Contains(low, "required") || strings.Contains(low, "401") || strings.Contains(low, "unauthorized"):

@@ -15,7 +15,7 @@ import (
 )
 
 // ErrUnavailable dikembalikan bila program tesseract tidak terpasang.
-var ErrUnavailable = errors.New("OCR offline tidak tersedia (tesseract belum terpasang)")
+var ErrUnavailable = errors.New("OCR offline tidak tersedia: Tesseract belum terpasang (winget install UB-Mannheim.TesseractOCR, lalu jalankan ulang MyMoney)")
 
 // find mencari program di PATH, variabel env, atau lokasi instal umum Windows.
 func find(name, envKey string, winDirs ...string) string {
