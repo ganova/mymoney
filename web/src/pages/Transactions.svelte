@@ -239,6 +239,7 @@
               <th><button onclick={() => sortBy('category')}>Kategori{arrow('category')}</button></th>
               <th><button onclick={() => sortBy('account')}>Akun{arrow('account')}</button></th>
               <th class="r"><button onclick={() => sortBy('amount')}>Nominal{arrow('amount')}</button></th>
+              <th class="r" title="Saldo akun tepat setelah transaksi ini">Saldo{accountId ? ` ${acc(accountId)?.name ?? ''}` : ''}</th>
             </tr>
           </thead>
           <tbody>
@@ -258,6 +259,7 @@
                 <td class="ellipsis">{#if t.type === 'transfer'}<span class="muted">Transfer</span>{:else if t.type === 'adjust'}<span class="muted">Penyesuaian</span>{:else}{c?.name ?? '—'}{#if s}<span class="muted">&nbsp;· {s.name}</span>{/if}{/if}</td>
                 <td class="ellipsis">{acc(t.account_id)?.name ?? '?'}{#if t.type === 'transfer'}<span class="muted">&nbsp;→ {anyAccount(t.to_account_id)?.name ?? '?'}</span>{/if}</td>
                 <td class="r num am" class:good={v > 0} class:muted={v === 0}>{v > 0 ? '+' : v < 0 ? '−' : ''}{rp(Math.abs(t.amount))}</td>
+                <td class="r num bal" class:bad={(t.balance_after ?? 0) < 0}>{t.balance_after === undefined ? '' : rp(t.balance_after)}</td>
               </tr>
             {/each}
           </tbody>
@@ -337,9 +339,11 @@
   .tx .ck { width: 44px; text-align: center; }
   .tx .ck input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
   .tx th:nth-child(2) { width: 132px; }
-  .tx th:nth-child(4) { width: 21%; }
-  .tx th:nth-child(5) { width: 17%; }
-  .tx th:nth-child(6) { width: 150px; }
+  .tx th:nth-child(4) { width: 17%; }
+  .tx th:nth-child(5) { width: 13%; }
+  .tx th:nth-child(6) { width: 140px; }
+  .tx th:nth-child(7) { width: 140px; }
+  .tx .bal { color: var(--text-2); white-space: nowrap; }
   .tx .r { text-align: right; }
   .tx .dt { white-space: nowrap; }
   .tx .dt .tiny { margin-left: 6px; }

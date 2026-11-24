@@ -572,3 +572,45 @@ func TestBackupCreatesAndPrunes(t *testing.T) {
 		t.Fatalf("berkas backup: %+v", list[0])
 	}
 }
+
+func TestBalanceAfterInList(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	bca, tunai := idOf(t, s, "BCA"), idOf(t, s, "Tunai")
+	makan := idOf(t, s, "Makan & Minum")
+	gaji := idOf(t, s, "Gaji")
+	d0 := s.Today().AddDate(0, 0, -3).Format("2006-01-02")
+	d1 := s.Today().AddDate(0, 0, -2).Format("2006-01-02")
+	mk := func(tx Transaction) int64 {
+		r, err := s.CreateTransaction(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.ID
+	}
+	inc := mk(Transaction{Type: "income", Amount: 1_000_000, AccountID: bca, CategoryID: &gaji, Date: d0})
+	exp := mk(Transaction{Type: "expense", Amount: 50_000, AccountID: bca, CategoryID: &makan, Date: d0})
+	trf := mk(Transaction{Type: "transfer", Amount: 200_000, AccountID: bca, ToAccountID: &tunai, Date: d1})
+	cash := mk(Transaction{Type: "expense", Amount: 30_000, AccountID: tunai, CategoryID: &makan, Date: d1})
+	list, err := s.ListTransactions(ctx, TxFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int64]int64{inc: 1_000_000, exp: 950_000, trf: 750_000, cash: 170_000}
+	for _, x := range list {
+		if x.BalanceAfter == nil || *x.BalanceAfter != want[x.ID] {
+			t.Fatalf("saldo setelah tx %d (%s %d): %v, harapan %d", x.ID, x.Type, x.Amount, x.BalanceAfter, want[x.ID])
+		}
+	}
+	// difilter per akun: saldo yang ditampilkan adalah saldo akun itu (transfer masuk ikut)
+	only, _ := s.ListTransactions(ctx, TxFilter{AccountID: tunai})
+	wantTunai := map[int64]int64{trf: 200_000, cash: 170_000}
+	if len(only) != 2 {
+		t.Fatalf("filter tunai: %d baris", len(only))
+	}
+	for _, x := range only {
+		if *x.BalanceAfter != wantTunai[x.ID] {
+			t.Fatalf("filter akun: tx %d saldo %d, harapan %d", x.ID, *x.BalanceAfter, wantTunai[x.ID])
+		}
+	}
+}

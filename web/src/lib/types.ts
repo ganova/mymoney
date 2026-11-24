@@ -126,6 +126,8 @@ export interface Transaction {
   source: string;
   raw?: string;
   created_at?: string;
+  /** saldo akun setelah transaksi ini (hanya dari daftar transaksi) */
+  balance_after?: number;
 }
 
 export interface Draft {

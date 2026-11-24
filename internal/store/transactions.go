@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,6 +33,9 @@ type Transaction struct {
 	Source         string `json:"source"`
 	Raw            string `json:"raw,omitempty"`
 	CreatedAt      string `json:"created_at"`
+	// BalanceAfter: saldo akun (AccountID) tepat setelah transaksi ini, menurut
+	// urutan tanggal lalu id. Hanya diisi oleh ListTransactions.
+	BalanceAfter *int64 `json:"balance_after,omitempty"`
 }
 
 const txCols = `id, date, type, amount, account_id, to_account_id, category_id, debt_id, income_source_id, ledger_id, description, note, source, raw, created_at`
@@ -285,7 +289,12 @@ func (s *Store) ListTransactions(ctx context.Context, f TxFilter) ([]Transaction
 		f.Limit = 200
 	}
 	args = append(args, f.Limit, f.Offset)
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+txCols+` FROM transactions WHERE `+strings.Join(where, " AND ")+
+	// saldo berjalan: akun yang difilter, atau akun sumber tiap transaksi
+	acct := "t.account_id"
+	if f.AccountID != 0 {
+		acct = strconv.FormatInt(f.AccountID, 10)
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+txCols+`, `+balanceAfterSQL(acct)+` FROM transactions t WHERE `+strings.Join(where, " AND ")+
 		` ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, err
@@ -293,10 +302,12 @@ func (s *Store) ListTransactions(ctx context.Context, f TxFilter) ([]Transaction
 	defer rows.Close()
 	out := []Transaction{}
 	for rows.Next() {
-		t, err := scanTx(rows)
+		var bal int64
+		t, err := scanTx(rowWithExtra{rows, &bal})
 		if err != nil {
 			return nil, err
 		}
+		t.BalanceAfter = &bal
 		out = append(out, t)
 	}
 	return out, rows.Err()
@@ -368,3 +379,27 @@ func sameInt(a, b *int64) bool {
 	}
 	return *a == *b
 }
+
+// balanceAfterSQL menghitung saldo akun acct (ekspresi SQL, mis. "t.account_id"
+// atau id akun) setelah transaksi t: saldo awal + semua transaksi akun itu yang
+// terjadi sebelum atau sama dengan t (urut tanggal, lalu id), dengan aturan
+// yang sama seperti saldo akun.
+func balanceAfterSQL(acct string) string {
+	return `((SELECT a.opening_balance FROM accounts a WHERE a.id = ` + acct + `)
+  + COALESCE((SELECT SUM(
+      CASE WHEN t2.account_id = ` + acct + ` THEN
+        CASE t2.type WHEN 'income' THEN t2.amount WHEN 'adjust' THEN t2.amount ELSE -t2.amount END
+      ELSE 0 END
+      + CASE WHEN t2.to_account_id = ` + acct + ` AND t2.type = 'transfer' THEN t2.amount ELSE 0 END)
+    FROM transactions t2
+    WHERE (t2.account_id = ` + acct + ` OR t2.to_account_id = ` + acct + `)
+      AND (t2.date < t.date OR (t2.date = t.date AND t2.id <= t.id))), 0))`
+}
+
+// rowWithExtra memindai kolom txCols lalu satu kolom tambahan.
+type rowWithExtra struct {
+	sc    interface{ Scan(...any) error }
+	extra any
+}
+
+func (r rowWithExtra) Scan(dest ...any) error { return r.sc.Scan(append(dest, r.extra)...) }
