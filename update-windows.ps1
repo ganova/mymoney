@@ -33,8 +33,38 @@ Pop-Location
 
 Write-Host "==> Membangun program"
 $env:CGO_ENABLED = "0"
-go build -ldflags "-H=windowsgui" -o (Join-Path $root "mymoney.exe") ./cmd/mymoney
-if ($LASTEXITCODE -ne 0) { Write-Host "Build Go gagal"; exit 1 }
+$exe = Join-Path $root "mymoney.exe"
+$log = Join-Path $root "build-error.log"
+# Hemat memori: compiler Go bisa kehabisan RAM saat mengompilasi SQLite.
+# Percobaan 1: 2 proses paralel. Percobaan 2: satu per satu, GC lebih sering.
+$attempts = @(
+  @{ procs = "2"; gogc = "50"; p = "2" },
+  @{ procs = "1"; gogc = "25"; p = "1" }
+)
+$ok = $false
+# Windows PowerShell 5.1 menganggap teks stderr program (mis. "go: downloading")
+# sebagai error yang menghentikan skrip bila ErrorActionPreference = Stop.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+foreach ($a in $attempts) {
+  $env:GOMAXPROCS = $a.procs
+  $env:GOGC = $a.gogc
+  & go build -p $a.p -ldflags "-H=windowsgui" -o $exe ./cmd/mymoney *> $log
+  if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+  Write-Host "Build Go gagal, mencoba ulang dengan mode lebih hemat memori..."
+}
+$ErrorActionPreference = $prevEAP
+Remove-Item Env:GOMAXPROCS, Env:GOGC -ErrorAction SilentlyContinue
+if (-not $ok) {
+  Write-Host ""
+  Write-Host "Build Go gagal. Awal pesan error (lengkapnya di $log):" -ForegroundColor Red
+  Get-Content $log -TotalCount 15
+  $free = [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB, 1)
+  Write-Host ""
+  Write-Host "RAM kosong saat ini: $free GB. Tutup browser/aplikasi berat lalu ulangi."
+  exit 1
+}
+Remove-Item $log -ErrorAction SilentlyContinue
 
 Write-Host "==> Memasang"
 & (Join-Path $root "install-windows.ps1")
