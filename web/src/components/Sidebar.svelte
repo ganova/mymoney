@@ -26,6 +26,7 @@
       label: 'Data',
       items: [
         { path: '/import', icon: 'upload', label: 'Impor Mutasi', key: '' },
+        { path: '/email', icon: 'chat', label: 'Email Bank Otomatis', key: '' },
         { path: '/categories', icon: 'tag', label: 'Kategori', key: '' },
         { path: '/sources', icon: 'database', label: 'Sumber & Buku', key: '' },
       ],

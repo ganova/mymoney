@@ -23,6 +23,7 @@ Aplikasi keuangan pribadi (bahasa Indonesia) untuk satu pengguna, dipakai dari S
 - Jatah mingguan membawa sisa/kekurangan minggu yang sudah selesai ke minggu berikutnya (`WeekPlan.Base` + `Carry` = `Allowance`).
 - Backup (`internal/store/backup.go`, `server/backup_loop.go`): `VACUUM INTO` ke `BACKUP_DIR` (bawaan `data/backups`), dijadwalkan tiap `BACKUP_EVERY_HOURS`, disimpan `BACKUP_KEEP` versi.
 - Folder backup: setting DB `backup_dir` → `BACKUP_DIR` → `data/backups` (`Server.backupFolder`, jatuh ke bawaan bila tak bisa diakses). Laporan bulanan xlsx periode sebelumnya per buku dibuat oleh `ensureMonthlyReports` (`server/report_xlsx.go`) dari loop yang sama.
+- Impor email (`internal/mailimport`, `server/email.go`): IMAP Gmail tiap 5 menit, konfigurasi + App Password di `data/email-import.json` (bukan DB), riwayat/dedupe di tabel `email_imports`, transaksi bersumber `email`; AI via `Server.ai.Extract`, cadangan `ai.ParseEmailOffline`. Tes memakai `imapmemserver`.
 - Budget per (periode, kategori); `due_day > 0` = tagihan. `EnsureBudget` menyalin budget terakhir ke periode berjalan bila kosong.
 - Aturan (`rules`) dipelajari otomatis saat transaksi disimpan/dikoreksi dan dimasukkan ke prompt AI serta parser offline.
 - Draf AI (`ai.Draft`) selalu melewati `Context.Sanitize` agar ID akun/kategori valid; pengguna mengonfirmasi sebelum disimpan (kecuali Shortcut/autosave).

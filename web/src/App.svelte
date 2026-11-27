@@ -23,6 +23,7 @@
   import SettingsPage from './pages/Settings.svelte';
   import SourcesPage from './pages/Sources.svelte';
   import PendingPage from './pages/Pending.svelte';
+  import EmailPage from './pages/Email.svelte';
 
   onMount(bootstrap);
 
@@ -40,6 +41,7 @@
     '/settings': SettingsPage,
     '/sources': SourcesPage,
     '/pending': PendingPage,
+    '/email': EmailPage,
   };
   const Page = $derived(pages[route.path] ?? Home);
   const showDock = $derived(ui.desktop && ui.dock && route.path !== '/ai');

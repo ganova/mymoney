@@ -254,7 +254,7 @@
                 <td class="ds">
                   <span class="em">{t.type === 'transfer' ? '🔁' : t.type === 'adjust' ? '⚖️' : (c?.icon ?? (t.type === 'income' ? '💵' : '🧾'))}</span>
                   <span class="grow ellipsis"><b>{t.description || c?.name || 'Transaksi'}</b>{#if t.note}<span class="muted">&nbsp;— {t.note}</span>{/if}</span>
-                  {#if t.source && t.source !== 'manual'}<span class="badge">{t.source === 'ai_text' ? 'AI' : t.source === 'ai_image' ? 'scan' : t.source === 'import' ? 'impor' : t.source === 'shortcut' ? 'siri' : t.source}</span>{/if}
+                  {#if t.source && t.source !== 'manual'}<span class="badge">{t.source === 'ai_text' ? 'AI' : t.source === 'ai_image' ? 'scan' : t.source === 'import' ? 'impor' : t.source === 'shortcut' ? 'siri' : t.source === 'email' ? 'email' : t.source}</span>{/if}
                 </td>
                 <td class="ellipsis">{#if t.type === 'transfer'}<span class="muted">Transfer</span>{:else if t.type === 'adjust'}<span class="muted">Penyesuaian</span>{:else}{c?.name ?? '—'}{#if s}<span class="muted">&nbsp;· {s.name}</span>{/if}{/if}</td>
                 <td class="ellipsis">{acc(t.account_id)?.name ?? '?'}{#if t.type === 'transfer'}<span class="muted">&nbsp;→ {anyAccount(t.to_account_id)?.name ?? '?'}</span>{/if}</td>

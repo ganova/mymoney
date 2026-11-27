@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ganova/mymoney/internal/ai"
@@ -33,6 +34,10 @@ type Server struct {
 	backupDir   string
 	backupKeep  int
 	backupEvery time.Duration
+	// impor email (dapat diganti di tes)
+	emailMu      sync.Mutex
+	imapAddr     string
+	imapInsecure bool
 }
 
 // New menyusun server beserta seluruh rute.
@@ -130,6 +135,12 @@ func (s *Server) routes() {
 
 	p("GET /api/export", s.handleExport)
 	p("GET /api/backup", s.handleBackup)
+	p("GET /api/email/config", s.handleEmailConfig)
+	p("PUT /api/email/config", s.handleSaveEmailConfig)
+	p("POST /api/email/test", s.handleTestEmail)
+	p("POST /api/email/run", s.handleRunEmail)
+	p("GET /api/email/imports", s.handleListEmailImports)
+	p("DELETE /api/email/imports/{id}", s.handleDeleteEmailImport)
 	p("GET /api/backup/status", s.handleBackupStatus)
 	p("POST /api/backup/now", s.handleBackupNow)
 	p("PUT /api/backup/dir", s.handleSetBackupDir)

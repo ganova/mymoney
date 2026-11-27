@@ -246,3 +246,10 @@ Untuk buku Utama (bisa diatur per buku di Pengaturan → Jatah mingguan), uang f
 
 ## Laporan bulanan otomatis (Excel)
 Setiap periode baru dimulai (tanggal mulai periode, bawaan 28), aplikasi membuat laporan lengkap periode **sebelumnya** di folder backup, satu berkas per buku yang punya transaksi: `Laporan Oktober 2026 - Utama.xlsx`. Isinya: Ringkasan (pemasukan, pengeluaran, selisih, budget wajib/fleksibel, pemasukan per sumber, jatah mingguan, per akun, tren 6 periode, saldo akun, utang), Per Kategori, Budget, Harian, Pengeluaran Terbesar, dan seluruh Transaksi. Bila PC mati di tanggal itu, laporan dibuat saat aplikasi berikutnya berjalan. Berkas yang sudah ada tidak ditimpa; tombol *Buat ulang laporan periode lalu* di Pengaturan membuatnya ulang.
+
+## Email bank otomatis (Gmail)
+**Lainnya → Email Bank Otomatis.** MyMoney memeriksa Gmail lewat IMAP setiap 5 menit, mencari email dari pengirim yang mengandung `bca.co.id` (bisa diubah), dan mencatat transaksinya otomatis (sumber `email`).
+- Butuh **App Password** Google (Verifikasi 2 Langkah aktif → myaccount.google.com/apppasswords) dan IMAP aktif di setelan Gmail. App Password disimpan di `data/email-import.json`, tidak di database, sehingga tidak ikut backup.
+- Email dibaca dalam mode baca-saja (tidak ditandai sudah dibaca). Setiap email diproses sekali; email yang transaksinya sudah tercatat manual dilewati sebagai duplikat.
+- Dibaca dengan AI bila aktif; bila tidak/gagal, pembaca tanpa AI mengambil nominal (IDR/Rp, bukan saldo/biaya), merchant/penerima, dan arah transaksi, lalu menebak kategori dari aturan & kebiasaan.
+- Riwayat di halaman yang sama; email yang gagal/dilewati bisa *Ulangi*.

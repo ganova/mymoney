@@ -48,7 +48,7 @@ func scanTx(sc interface{ Scan(...any) error }) (Transaction, error) {
 	return t, err
 }
 
-var txSources = map[string]bool{"manual": true, "ai_text": true, "ai_image": true, "import": true, "shortcut": true, "bill": true}
+var txSources = map[string]bool{"manual": true, "ai_text": true, "ai_image": true, "import": true, "shortcut": true, "bill": true, "email": true}
 
 // validate memeriksa dan merapikan transaksi sebelum disimpan.
 func (s *Store) validate(ctx context.Context, t *Transaction) error {

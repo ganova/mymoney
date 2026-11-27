@@ -11,6 +11,7 @@
     { path: '/pending', icon: '⏳', title: 'Pendapatan Tertunda', sub: 'Dana ditahan Fastwork/klien, proyeksi ke depan' },
     { path: '/debts', icon: '💳', title: 'Utang & Cicilan', sub: 'Paylater, pinjaman, sisa tagihan' },
     { path: '/reports', icon: '📊', title: 'Laporan', sub: 'Grafik, tren, pengeluaran terbesar' },
+    { path: '/email', icon: '📧', title: 'Email Bank Otomatis', sub: 'Catat otomatis dari email notifikasi BCA di Gmail' },
     { path: '/import', icon: '📥', title: 'Impor Mutasi', sub: 'Screenshot, teks, Excel, PDF e-statement' },
     { path: '/settings', icon: '⚙️', title: 'Pengaturan', sub: 'Periode, AI, iPhone Shortcut, backup' },
   ];

@@ -47,6 +47,7 @@
       nav('/debts', 'card', 'Utang & Cicilan', 'G U'),
       nav('/pending', 'calendar', 'Pendapatan Tertunda', 'G P'),
       nav('/import', 'upload', 'Impor Mutasi'),
+      nav('/email', 'chat', 'Email Bank Otomatis'),
       nav('/categories', 'tag', 'Kategori'),
       nav('/sources', 'database', 'Sumber Pemasukan & Buku'),
       nav('/settings', 'settings', 'Pengaturan'),

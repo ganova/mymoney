@@ -269,6 +269,19 @@ UPDATE accounts SET name = 'Kas Freelance' WHERE ledger_id = 2 AND name = 'Kas W
 UPDATE categories SET grp = 'Freelance' WHERE ledger_id = 2 AND grp = 'Work';
 UPDATE categories SET name = 'Lain-lain Freelance' WHERE ledger_id = 2 AND name = 'Lain-lain Work';
 UPDATE categories SET name = 'Pemasukan Freelance Lain' WHERE ledger_id = 2 AND name = 'Pemasukan Work Lain';`,
+	// v7: email notifikasi bank yang sudah diproses (agar tidak dicatat dua kali)
+	`CREATE TABLE email_imports (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id   INTEGER NOT NULL DEFAULT 1,
+  message_id  TEXT NOT NULL UNIQUE,
+  sender      TEXT NOT NULL DEFAULT '',
+  subject     TEXT NOT NULL DEFAULT '',
+  received_at TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL,
+  tx_ids      TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

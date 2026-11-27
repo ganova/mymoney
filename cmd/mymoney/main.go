@@ -93,6 +93,7 @@ func main() {
 	bctx, stopBackups := context.WithCancel(context.Background())
 	defer stopBackups()
 	go srv.RunBackups(bctx, cfg.BackupKeep, cfg.BackupEvery)
+	go srv.RunEmailImport(bctx)
 
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
