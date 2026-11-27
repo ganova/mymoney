@@ -8,6 +8,7 @@
   import PeriodNav from '../components/PeriodNav.svelte';
   import Sheet from '../components/Sheet.svelte';
   import AmountField from '../components/AmountField.svelte';
+  import BudgetDonut from '../components/BudgetDonut.svelte';
 
   let periodKey = $state(route.query.period ?? app.period?.key ?? '');
   let d = $state<Dashboard | null>(null);
@@ -215,6 +216,13 @@
         </div>
       {/if}
     </section>
+
+    {#if d.plan_expense > 0}
+      <section class="card comp" class:dim={loading}>
+        <div class="card-title">Komposisi rencana</div>
+        <BudgetDonut income={d.plan_income} mandatory={d.bills_total} flexible={d.flex_plan} />
+      </section>
+    {/if}
 
     {#if d.budgets.length === 0 && !loading}
       <div class="card empty">
