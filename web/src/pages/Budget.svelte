@@ -220,7 +220,10 @@
     {#if d.plan_expense > 0}
       <section class="card comp" class:dim={loading}>
         <div class="card-title">Komposisi rencana</div>
-        <BudgetDonut income={d.plan_income} mandatory={d.bills_total} flexible={d.flex_plan} />
+        <BudgetDonut
+          income={d.plan_income}
+          lines={d.budgets.filter((b) => b.kind === 'expense').map((b) => ({ key: String(b.id), name: cat(b.category_id)?.name ?? 'Kategori', icon: cat(b.category_id)?.icon ?? '', amount: b.amount, mandatory: b.mandatory }))}
+        />
       </section>
     {/if}
 
