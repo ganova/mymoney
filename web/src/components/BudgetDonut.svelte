@@ -16,6 +16,8 @@
   const expense = $derived(mandatory + flexible);
   const leftover = $derived(Math.max(income - expense, 0));
   const whole = $derived(Math.max(income, expense, 1));
+  // dasar semua persentase: rencana pemasukan (bila belum ada, rencana pengeluaran)
+  const base = $derived(income > 0 ? income : expense);
   const pctOf = (v: number, base: number) => (base > 0 ? Math.round((v / base) * 1000) / 10 : 0);
 
   const REST = 'color-mix(in srgb, var(--muted) 45%, var(--surface))';
@@ -66,7 +68,7 @@
 
 <div class="donut-box">
   <div class="donut-wrap">
-    <svg viewBox="0 0 200 200" role="img" aria-label="Komposisi rencana per kategori: wajib {pctOf(mandatory, expense)}% dari rencana pengeluaran" onmouseleave={() => (hov = null)}>
+    <svg viewBox="0 0 200 200" role="img" aria-label="Komposisi rencana per kategori terhadap pemasukan: teralokasi {pctOf(expense, base)}%" onmouseleave={() => (hov = null)}>
       {#each [...outerPaths, ...innerPaths] as s (s.key)}
         <path
           d={s.d}
@@ -84,12 +86,12 @@
         />
       {/each}
       {#if active}
-        <text x="100" y="96" text-anchor="middle" class="c-big">{pctOf(active.value, active.group === 'sisa' ? whole : expense)}%</text>
+        <text x="100" y="96" text-anchor="middle" class="c-big">{pctOf(active.value, base)}%</text>
         <text x="100" y="111" text-anchor="middle" class="c-small">{active.label.length > 16 ? active.label.slice(0, 15) + '…' : active.label}</text>
         <text x="100" y="123" text-anchor="middle" class="c-small">{rp(active.value)}</text>
       {:else}
-        <text x="100" y="100" text-anchor="middle" class="c-big">{pctOf(mandatory, expense)}%</text>
-        <text x="100" y="115" text-anchor="middle" class="c-small">wajib / keluar</text>
+        <text x="100" y="100" text-anchor="middle" class="c-big">{pctOf(expense, base)}%</text>
+        <text x="100" y="115" text-anchor="middle" class="c-small">{income > 0 ? 'teralokasi' : 'dari rencana keluar'}</text>
       {/if}
     </svg>
 
@@ -100,7 +102,7 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="gh" onmouseenter={() => (hov = 'g-' + g.key)} onmouseleave={() => (hov = null)}>
               <i class="sw" style:background={g.key === 'wajib' ? 'var(--series-1)' : 'var(--series-2)'}></i>
-              <span class="grow">{g.title} <span class="muted">{pctOf(g.total, expense)}%</span></span>
+              <span class="grow">{g.title} <span class="muted">{pctOf(g.total, base)}%</span></span>
               <span class="num">{rp(g.total)}</span>
             </div>
             {#each g.list as s (s.key)}
@@ -108,7 +110,7 @@
               <div class="li" class:on={hov === s.key} onmouseenter={() => (hov = s.key)} onmouseleave={() => (hov = null)}>
                 <i class="sw sm" style:background={s.color}></i>
                 <span class="grow ellipsis">{s.icon} {s.label}</span>
-                <span class="pc muted">{pctOf(s.value, expense)}%</span>
+                <span class="pc muted">{pctOf(s.value, base)}%</span>
                 <span class="num amt">{rp(s.value)}</span>
               </div>
             {/each}
@@ -119,14 +121,14 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="gh rest" onmouseenter={() => (hov = 'sisa')} onmouseleave={() => (hov = null)}>
           <i class="sw" style:background={REST}></i>
-          <span class="grow">Belum dialokasikan <span class="muted">{pctOf(leftover, income)}% pendapatan</span></span>
+          <span class="grow">Belum dialokasikan <span class="muted">{pctOf(leftover, base)}%</span></span>
           <span class="num">{rp(leftover)}</span>
         </div>
       {/if}
       {#if income > 0 && expense > income}
         <div class="tiny bad">Rencana keluar melebihi pendapatan {rp(expense - income)}</div>
       {/if}
-      <div class="tiny muted">Persentase kategori = porsi dari rencana pengeluaran {rp(expense)}{income > 0 ? `; wajib = ${pctOf(mandatory, income)}% dari pendapatan` : ''}.</div>
+      <div class="tiny muted">{income > 0 ? `Semua persentase = porsi dari rencana pemasukan ${rp(income)}.` : `Belum ada rencana pemasukan; persentase dari rencana pengeluaran ${rp(expense)}.`}</div>
     </div>
   </div>
 </div>
